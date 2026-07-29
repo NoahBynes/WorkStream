@@ -21,11 +21,12 @@ function render(path) {
     document.querySelectorAll('.nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.route === path);
     });
-    // 关闭移动端侧边栏（含遮罩与菜单按钮恢复）
+    // 关闭移动端侧边栏（含遮罩、菜单按钮恢复、body 滚动解锁）
     document.getElementById('sidebar')?.classList.remove('open');
     document.getElementById('sidebar-overlay')?.classList.remove('show');
     const menuToggle = document.getElementById('menu-toggle');
     if (menuToggle) menuToggle.style.display = '';
+    document.body.style.overflow = '';  // 恢复背景页面滚动
     // 渲染页面
     const container = document.getElementById('page-container');
     container.innerHTML = '<div class="loading">加载中...</div>';
