@@ -1,0 +1,157 @@
+// localStorage 配置 + 通用工具函数
+
+const store = {
+    get(key, defaultValue = null) {
+        try {
+            const v = localStorage.getItem(key);
+            return v ? JSON.parse(v) : defaultValue;
+        } catch { return defaultValue; }
+    },
+    set(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+    },
+    remove(key) { localStorage.removeItem(key); }
+};
+
+// 主题管理
+function getTheme() { return store.get('theme', 'light'); }
+function setTheme(theme) {
+    store.set('theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f172a' : '#6366f1');
+}
+function toggleTheme() {
+    const next = getTheme() === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    return next;
+}
+
+// Toast 通知
+function toast(message, type = 'info', duration = 2500) {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = message;
+    container.appendChild(el);
+    setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(100%)';
+        el.style.transition = 'all 0.25s';
+        setTimeout(() => el.remove(), 250);
+    }, duration);
+}
+
+// 日期工具
+const date = {
+    today() { return new Date().toISOString().slice(0, 10); },
+    now() { return new Date().toISOString(); },
+    format(iso, withTime = false) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        const pad = n => String(n).padStart(2, '0');
+        let s = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        if (withTime) s += ` ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return s;
+    },
+    monthStart() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    },
+    monthEnd() {
+        const d = new Date();
+        const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+    },
+    daysAgo(n) {
+        const d = new Date();
+        d.setDate(d.getDate() - n);
+        return d.toISOString().slice(0, 10);
+    }
+};
+
+// HTML 转义
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// 货币格式化
+function formatMoney(n) {
+    return '¥' + Number(n || 0).toFixed(2);
+}
+
+// 确认对话框（Promise）
+function confirmDialog(message) {
+    return Promise.resolve(window.confirm(message));
+}
+
+// 输入对话框（Promise）- 替代 prompt()
+// 支持多字段：fields 为 [{key, label, placeholder, type, default}] 数组
+// 返回 {values: {...}, cancelled: bool}
+function formDialog({ title, fields, submitText = '确定', cancelText = '取消' }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+        const fieldHtml = fields.map(f => `
+            <div class="field">
+                ${f.label ? `<label class="field-label">${f.label}</label>` : ''}
+                <input class="input" id="fd-${f.key}" type="${f.type || 'text'}" placeholder="${f.placeholder || ''}" value="${f.default != null ? f.default : ''}">
+            </div>
+        `).join('');
+        overlay.innerHTML = `
+            <div class="card" style="max-width:440px;width:100%">
+                <div class="card-title"><span>${title}</span><button class="btn btn-sm btn-ghost" id="fd-close">✕</button></div>
+                <form id="fd-form">
+                    ${fieldHtml}
+                    <div class="flex gap-2 mt-3">
+                        <button class="btn btn-secondary flex-1" type="button" id="fd-cancel">${cancelText}</button>
+                        <button class="btn flex-1" type="submit">${submitText}</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const firstInput = overlay.querySelector('input');
+        if (firstInput) { firstInput.focus(); firstInput.select(); }
+
+        const close = (result) => { overlay.remove(); resolve(result); };
+
+        const collect = () => {
+            const values = {};
+            fields.forEach(f => {
+                const el = overlay.querySelector(`#fd-${f.key}`);
+                let v = el.value.trim();
+                if (f.type === 'number') v = v === '' ? null : parseFloat(v);
+                values[f.key] = v;
+            });
+            return values;
+        };
+
+        overlay.querySelector('#fd-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            close({ values: collect(), cancelled: false });
+        });
+        overlay.querySelector('#fd-cancel').addEventListener('click', () => close({ values: {}, cancelled: true }));
+        overlay.querySelector('#fd-close').addEventListener('click', () => close({ values: {}, cancelled: true }));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close({ values: {}, cancelled: true }); });
+        overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close({ values: {}, cancelled: true }); });
+    });
+}
+
+// 单字段输入对话框（Promise）- 返回 string 或 null（取消）
+async function promptDialog(message, defaultValue = '') {
+    const r = await formDialog({
+        title: message,
+        fields: [{ key: 'v', default: defaultValue }],
+        submitText: '确定'
+    });
+    return r.cancelled ? null : r.values.v;
+}
+
+export { store, getTheme, setTheme, toggleTheme, toast, date, escapeHtml, formatMoney, confirmDialog, formDialog, promptDialog };

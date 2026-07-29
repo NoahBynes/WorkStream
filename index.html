@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="个人工作台 - 日常学习、身材管理、财务规划、热点搜集">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" href="./icon-192.png">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="stylesheet" href="./styles/theme.css">
+    <link rel="stylesheet" href="./styles/main.css">
+    <title>WorkStream · 个人工作台</title>
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="./icon-192.png" alt="logo" class="logo">
+                <span class="brand">Noah's WorkStream</span>
+            </div>
+            <nav class="nav">
+                <a href="#/dashboard" class="nav-item" data-route="dashboard">
+                    <span class="nav-icon">📊</span><span class="nav-label">仪表盘</span>
+                </a>
+                <a href="#/study" class="nav-item" data-route="study">
+                    <span class="nav-icon">📚</span><span class="nav-label">日常学习</span>
+                </a>
+                <a href="#/fitness" class="nav-item" data-route="fitness">
+                    <span class="nav-icon">💪</span><span class="nav-label">身材管理</span>
+                </a>
+                <a href="#/finance" class="nav-item" data-route="finance">
+                    <span class="nav-icon">💰</span><span class="nav-label">财务规划</span>
+                </a>
+                <a href="#/news" class="nav-item" data-route="news">
+                    <span class="nav-icon">🔥</span><span class="nav-label">热点搜集</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="qr-fab" id="btn-quick-record" title="快速记录">⚡ 快速记录</button>
+                <div class="flex" style="gap:6px;width:100%">
+                    <button class="btn-icon" id="btn-export" title="导出数据">📥 导出</button>
+                    <button class="btn-icon" id="btn-import" title="导入数据">📤 导入</button>
+                    <button class="btn-icon" id="btn-theme" title="切换主题">🌓</button>
+                </div>
+            </div>
+        </aside>
+
+        <button class="menu-toggle" id="menu-toggle" aria-label="菜单">☰</button>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <main class="main-content" id="main-content">
+            <div class="page-container" id="page-container">
+                <div class="loading">加载中...</div>
+            </div>
+        </main>
+    </div>
+
+    <input type="file" id="import-file" accept=".json" style="display:none">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
