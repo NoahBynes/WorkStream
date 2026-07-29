@@ -328,10 +328,20 @@ html, body {
     .sidebar { transform: translateX(-100%); box-shadow: var(--shadow-lg); }
     .sidebar.open { transform: translateX(0); }
     .main-content { margin-left: 0; }
-    .menu-toggle { display: block; }
-    .page-container { padding: 60px 16px 24px; }
+    .menu-toggle {
+        display: block;
+        top: calc(14px + env(safe-area-inset-top, 0px));
+    }
+    .page-container {
+        padding: calc(60px + env(safe-area-inset-top, 0px)) 16px 24px;
+    }
     .grid-2, .grid-4 { grid-template-columns: 1fr; }
     .stat-value { font-size: 22px; }
+}
+
+/* iOS PWA 侧边栏顶部安全区 */
+.sidebar-header {
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
 }
 
 /* 侧边栏遮罩（移动端） */
