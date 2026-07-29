@@ -52,24 +52,34 @@ function bindGlobalEvents() {
     menuToggle?.addEventListener('click', openSidebar);
     sidebarOverlay?.addEventListener('click', closeSidebar);
 
-    // 侧滑打开侧边栏（拦截 iOS 左边缘侧滑返回手势）
-    // 仅 PWA 模式启用；Safari 浏览器中保留原生侧滑返回
+    // 侧滑手势：左边缘右滑打开 / 侧边栏内左滑关闭（仅 PWA 模式）
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     if (isPWA) {
         const EDGE = 30;        // 左边缘触发区域宽度(px)
-        const SWIPE = 40;       // 触发打开所需水平位移(px)
-        let sx = 0, sy = 0, tracking = false;
+        const SWIPE = 40;       // 触发所需水平位移(px)
+        let sx = 0, sy = 0, tracking = false, mode = null; // mode: 'open' | 'close'
 
         window.addEventListener('touchstart', (e) => {
-            if (sidebar.classList.contains('open')) { tracking = false; return; }
             const t = e.touches[0];
-            if (t.clientX <= EDGE) {
-                sx = t.clientX; sy = t.clientY;
-                tracking = true;
-                // 在 touchstart 阶段立即拦截，阻止 iOS 系统级侧滑返回手势启动
-                e.preventDefault();
+            if (sidebar.classList.contains('open')) {
+                // 侧边栏打开状态：在侧边栏区域内触摸，准备左滑关闭
+                const sidebarWidth = sidebar.offsetWidth;
+                if (t.clientX <= sidebarWidth) {
+                    sx = t.clientX; sy = t.clientY;
+                    tracking = true; mode = 'close';
+                    return;
+                }
+                tracking = false; mode = null;
             } else {
-                tracking = false;
+                // 侧边栏关闭状态：左边缘右滑打开
+                if (t.clientX <= EDGE) {
+                    sx = t.clientX; sy = t.clientY;
+                    tracking = true; mode = 'open';
+                    // 立即拦截，阻止 iOS 系统级侧滑返回手势启动
+                    e.preventDefault();
+                } else {
+                    tracking = false; mode = null;
+                }
             }
         }, { passive: false, capture: true });
 
@@ -79,14 +89,19 @@ function bindGlobalEvents() {
             const dx = t.clientX - sx;
             const dy = Math.abs(t.clientY - sy);
             // 仅水平位移占主导时才处理，垂直滚动不干预
-            if (dx > dy * 1.5 && dx > SWIPE) {
+            if (Math.abs(dx) <= dy * 1.5) return;
+
+            if (mode === 'open' && dx > SWIPE) {
                 openSidebar();
-                tracking = false;
+                tracking = false; mode = null;
+            } else if (mode === 'close' && dx < -SWIPE) {
+                closeSidebar();
+                tracking = false; mode = null;
             }
         }, { passive: true, capture: true });
 
         window.addEventListener('touchend', () => {
-            tracking = false;
+            tracking = false; mode = null;
         }, { passive: true });
     }
 
