@@ -119,6 +119,7 @@ html, body {
     min-width: 0;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;  /* 防止子元素溢出导致 iOS 自动缩放 */
 }
 
 .page-container { padding: 24px 28px; max-width: 1200px; width: 100%; }
@@ -449,9 +450,12 @@ html, body {
 /* 仪表盘快捷记录条 */
 .quick-bar {
     display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;
+    min-width: 0;  /* 允许 flex 子项收缩，防止撑开父容器 */
+    -webkit-overflow-scrolling: touch;
 }
 .quick-bar-item {
-    flex: 1; min-width: 100px; padding: 12px; border: 1px solid var(--border);
+    flex: 0 0 auto;  /* 固定宽度，不收缩不增长，超出部分容器内滚动 */
+    min-width: 80px; padding: 12px; border: 1px solid var(--border);
     background: var(--surface); border-radius: var(--radius); cursor: pointer;
     font-family: inherit; color: var(--text); transition: all 0.15s;
     display: flex; flex-direction: column; align-items: center; gap: 4px;
