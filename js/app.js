@@ -56,41 +56,37 @@ function bindGlobalEvents() {
     // 仅 PWA 模式启用；Safari 浏览器中保留原生侧滑返回
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     if (isPWA) {
-        const EDGE = 25;        // 左边缘触发区域宽度(px)
-        const SWIPE = 35;       // 触发打开所需水平位移(px)
-        let sx = 0, sy = 0, tracking = false, locked = false;
+        const EDGE = 30;        // 左边缘触发区域宽度(px)
+        const SWIPE = 40;       // 触发打开所需水平位移(px)
+        let sx = 0, sy = 0, tracking = false;
 
-        document.addEventListener('touchstart', (e) => {
+        window.addEventListener('touchstart', (e) => {
             if (sidebar.classList.contains('open')) { tracking = false; return; }
             const t = e.touches[0];
             if (t.clientX <= EDGE) {
                 sx = t.clientX; sy = t.clientY;
-                tracking = true; locked = false;
+                tracking = true;
+                // 在 touchstart 阶段立即拦截，阻止 iOS 系统级侧滑返回手势启动
+                e.preventDefault();
             } else {
                 tracking = false;
             }
-        }, { passive: false });
+        }, { passive: false, capture: true });
 
-        document.addEventListener('touchmove', (e) => {
+        window.addEventListener('touchmove', (e) => {
             if (!tracking) return;
             const t = e.touches[0];
             const dx = t.clientX - sx;
             const dy = Math.abs(t.clientY - sy);
-            // 水平位移占主导时锁定为侧滑意图，阻止默认行为避免触发 iOS 返回
-            if (!locked && dx > 10 && dx > dy * 1.5) {
-                locked = true;
+            // 仅水平位移占主导时才处理，垂直滚动不干预
+            if (dx > dy * 1.5 && dx > SWIPE) {
+                openSidebar();
+                tracking = false;
             }
-            if (locked) {
-                e.preventDefault();  // 关键：阻止 iOS 侧滑返回手势
-                if (dx > SWIPE) {
-                    openSidebar();
-                    tracking = false; locked = false;
-                }
-            }
-        }, { passive: false });
+        }, { passive: true, capture: true });
 
-        document.addEventListener('touchend', () => {
-            tracking = false; locked = false;
+        window.addEventListener('touchend', () => {
+            tracking = false;
         }, { passive: true });
     }
 
