@@ -48,9 +48,47 @@ function bindGlobalEvents() {
         if (menuToggle) menuToggle.style.display = '';
         if (sidebarOverlay) sidebarOverlay.classList.remove('show');
     }
+    // 暴露给侧滑逻辑使用
+    window.__wsOpenSidebar = openSidebar;
+    window.__wsCloseSidebar = closeSidebar;
 
     menuToggle?.addEventListener('click', openSidebar);
     sidebarOverlay?.addEventListener('click', closeSidebar);
+
+    // 侧滑打开侧边栏（仅 PWA 模式，避免与 Safari 浏览器侧滑返回冲突）
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isPWA) {
+        let touchStartX = 0, touchStartY = 0, touchActive = false;
+        const EDGE_THRESHOLD = 25;   // 左边缘触发区域宽度
+        const SWIPE_THRESHOLD = 50;  // 触发打开所需水平位移
+
+        document.addEventListener('touchstart', (e) => {
+            if (sidebar.classList.contains('open')) return; // 已打开时不处理
+            const t = e.touches[0];
+            // 仅在左边缘 25px 内开始触摸才视为侧滑意图
+            if (t.clientX <= EDGE_THRESHOLD) {
+                touchStartX = t.clientX;
+                touchStartY = t.clientY;
+                touchActive = true;
+            } else {
+                touchActive = false;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!touchActive) return;
+            const t = e.touches[0];
+            const dx = t.clientX - touchStartX;
+            const dy = Math.abs(t.clientY - touchStartY);
+            // 水平位移明显大于垂直位移（避免误触上下滚动）
+            if (dx > SWIPE_THRESHOLD && dy < 40) {
+                openSidebar();
+                touchActive = false;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', () => { touchActive = false; }, { passive: true });
+    }
 
     // 导出数据
     document.getElementById('btn-export')?.addEventListener('click', async () => {
