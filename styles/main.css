@@ -11,6 +11,22 @@ html, body {
     transition: background 0.2s, color 0.2s;
 }
 
+/* iOS PWA 状态栏深色背景条（black-translucent 模式下保证白字可读，且不被遮罩层覆盖） */
+#status-bar-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: constant(safe-area-inset-top);
+    height: env(safe-area-inset-top, 0px);
+    background: var(--primary);
+    z-index: 200;
+    display: none;
+}
+@media (max-width: 768px) {
+    #status-bar-bg { display: block; }
+}
+
 #app {
     display: flex;
     min-height: 100vh;
@@ -330,10 +346,15 @@ html, body {
     .main-content { margin-left: 0; }
     .menu-toggle {
         display: block;
+        top: calc(14px + constant(safe-area-inset-top));
         top: calc(14px + env(safe-area-inset-top, 0px));
     }
     .page-container {
-        padding: calc(60px + env(safe-area-inset-top, 0px)) 16px 24px;
+        padding-top: calc(60px + constant(safe-area-inset-top));
+        padding-top: calc(60px + env(safe-area-inset-top, 0px));
+        padding-left: 16px;
+        padding-right: 16px;
+        padding-bottom: 24px;
     }
     .grid-2, .grid-4 { grid-template-columns: 1fr; }
     .stat-value { font-size: 22px; }
@@ -341,13 +362,15 @@ html, body {
 
 /* iOS PWA 侧边栏顶部安全区 */
 .sidebar-header {
+    padding-top: calc(20px + constant(safe-area-inset-top));
     padding-top: calc(20px + env(safe-area-inset-top, 0px));
 }
 
-/* 侧边栏遮罩（移动端） */
+/* 侧边栏遮罩（移动端）- 从状态栏下方开始，避免状态栏区域变暗 */
 .sidebar-overlay {
     display: none;
     position: fixed;
+    top: constant(safe-area-inset-top);
     top: env(safe-area-inset-top, 0px);
     left: 0;
     right: 0;
