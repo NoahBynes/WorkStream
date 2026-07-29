@@ -52,6 +52,48 @@ function bindGlobalEvents() {
     menuToggle?.addEventListener('click', openSidebar);
     sidebarOverlay?.addEventListener('click', closeSidebar);
 
+    // 侧滑打开侧边栏（拦截 iOS 左边缘侧滑返回手势）
+    // 仅 PWA 模式启用；Safari 浏览器中保留原生侧滑返回
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isPWA) {
+        const EDGE = 25;        // 左边缘触发区域宽度(px)
+        const SWIPE = 35;       // 触发打开所需水平位移(px)
+        let sx = 0, sy = 0, tracking = false, locked = false;
+
+        document.addEventListener('touchstart', (e) => {
+            if (sidebar.classList.contains('open')) { tracking = false; return; }
+            const t = e.touches[0];
+            if (t.clientX <= EDGE) {
+                sx = t.clientX; sy = t.clientY;
+                tracking = true; locked = false;
+            } else {
+                tracking = false;
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!tracking) return;
+            const t = e.touches[0];
+            const dx = t.clientX - sx;
+            const dy = Math.abs(t.clientY - sy);
+            // 水平位移占主导时锁定为侧滑意图，阻止默认行为避免触发 iOS 返回
+            if (!locked && dx > 10 && dx > dy * 1.5) {
+                locked = true;
+            }
+            if (locked) {
+                e.preventDefault();  // 关键：阻止 iOS 侧滑返回手势
+                if (dx > SWIPE) {
+                    openSidebar();
+                    tracking = false; locked = false;
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => {
+            tracking = false; locked = false;
+        }, { passive: true });
+    }
+
     // 导出数据
     document.getElementById('btn-export')?.addEventListener('click', async () => {
         try {
