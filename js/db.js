@@ -144,7 +144,11 @@ async function exportAllData() {
     for (const name of Object.keys(STORES)) {
         result[name] = await dbGetAll(name);
     }
-    return { version: DB_VERSION, exportedAt: new Date().toISOString(), data: result };
+    // 本地时区时间戳（避免 toISOString() 返回 UTC）
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const exportedAt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return { version: DB_VERSION, exportedAt, data: result };
 }
 
 // 导入数据（覆盖）

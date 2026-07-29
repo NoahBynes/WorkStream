@@ -1,6 +1,6 @@
 // 主应用入口
 import { registerRoute, initRouter, navigate } from './router.js';
-import { getTheme, setTheme, toggleTheme, toast, confirmDialog } from './store.js';
+import { getTheme, setTheme, toggleTheme, toast, confirmDialog, date } from './store.js';
 import { exportAllData, importAllData } from './db.js';
 import { openQuickRecord } from './components/quick-record.js';
 import renderDashboard from './pages/dashboard.js';
@@ -128,7 +128,7 @@ function bindGlobalEvents() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `workstream-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `workstream-backup-${date.today()}.json`;
             a.click();
             URL.revokeObjectURL(url);
             toast('数据已导出', 'success');

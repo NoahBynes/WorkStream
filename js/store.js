@@ -47,13 +47,23 @@ function toast(message, type = 'info', duration = 2500) {
     }, duration);
 }
 
-// 日期工具
+// 日期工具（统一使用本地时区，避免 toISOString() 返回 UTC 导致时区错乱）
 const date = {
-    today() { return new Date().toISOString().slice(0, 10); },
-    now() { return new Date().toISOString(); },
+    today() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    },
+    now() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    },
     format(iso, withTime = false) {
         if (!iso) return '';
-        const d = new Date(iso);
+        // 兼容 "YYYY-MM-DD HH:mm:ss" 和 ISO 8601 两种格式
+        const d = iso.includes('T') ? new Date(iso) : new Date(iso.replace(' ', 'T'));
+        if (isNaN(d.getTime())) return iso;
         const pad = n => String(n).padStart(2, '0');
         let s = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
         if (withTime) s += ` ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -61,17 +71,31 @@ const date = {
     },
     monthStart() {
         const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
     },
     monthEnd() {
         const d = new Date();
         const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(last)}`;
     },
     daysAgo(n) {
         const d = new Date();
         d.setDate(d.getDate() - n);
-        return d.toISOString().slice(0, 10);
+        const pad = x => String(x).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    },
+    // 获取当前时区显示名（如 "Asia/Shanghai (UTC+8)"）
+    timezone() {
+        try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '本地';
+            const offset = -new Date().getTimezoneOffset() / 60;
+            const sign = offset >= 0 ? '+' : '';
+            return `${tz} (UTC${sign}${offset})`;
+        } catch (e) {
+            return '本地时区';
+        }
     }
 };
 

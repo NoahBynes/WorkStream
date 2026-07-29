@@ -39,7 +39,7 @@ export default async function renderDashboard(container) {
         <div class="page-header">
             <div>
                 <div class="page-title">仪表盘</div>
-                <div class="page-subtitle">${date.format(today)} · 一目了然掌握全局</div>
+                <div class="page-subtitle">${date.format(today)} · ${date.timezone()} · 一目了然掌握全局</div>
             </div>
         </div>
 
