@@ -51,7 +51,7 @@ export default async function renderDashboard(container) {
         </div>
 
         <div class="quick-bar">
-            <button class="quick-bar-item" data-qr="task"><span class="qb-icon">📚</span><span class="qb-label">学习任务</span></button>
+            <button class="quick-bar-item" data-qr="task"><span class="qb-icon">📚</span><span class="qb-label">添加任务</span></button>
             <button class="quick-bar-item" data-qr="weight"><span class="qb-icon">⚖️</span><span class="qb-label">记体重</span></button>
             <button class="quick-bar-item" data-qr="expense"><span class="qb-icon">📉</span><span class="qb-label">记支出</span></button>
             <button class="quick-bar-item" data-qr="income"><span class="qb-icon">📈</span><span class="qb-label">记收入</span></button>

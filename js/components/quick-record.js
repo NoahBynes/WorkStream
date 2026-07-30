@@ -18,7 +18,7 @@ export function openQuickRecord() {
                 <button class="btn btn-sm btn-ghost" id="qr-close">✕</button>
             </div>
             <div class="qr-grid">
-                <button class="qr-item" data-type="task"><span class="qr-icon">📚</span><span>学习任务</span></button>
+                <button class="qr-item" data-type="task"><span class="qr-icon">📚</span><span>添加任务</span></button>
                 <button class="qr-item" data-type="weight"><span class="qr-icon">⚖️</span><span>记体重</span></button>
                 <button class="qr-item" data-type="expense"><span class="qr-icon">📉</span><span>记支出</span></button>
                 <button class="qr-item" data-type="income"><span class="qr-icon">📈</span><span>记收入</span></button>
@@ -56,7 +56,7 @@ export async function openQuickRecordType(type) {
 async function handleRecord(type) {
     if (type === 'task') {
         const r = await formDialog({
-            title: '📚 添加学习任务',
+            title: '📚 添加任务',
             fields: [
                 { key: 'title', label: '任务标题', placeholder: '必填' },
                 { key: 'subject', label: '科目/标签', placeholder: '可选' }
@@ -68,7 +68,7 @@ async function handleRecord(type) {
             id: genId(), title: r.values.title, subject: r.values.subject,
             priority: 'medium', done: false, date: date.today(), createdAt: date.now()
         });
-        toast('学习任务已添加', 'success');
+        toast('任务已添加', 'success');
     } else if (type === 'weight') {
         const r = await formDialog({
             title: '⚖️ 记录体重',
@@ -85,22 +85,19 @@ async function handleRecord(type) {
         });
         toast('体重已记录', 'success');
     } else if (type === 'expense' || type === 'income') {
-        const cats = CATEGORIES[type];
         const r = await formDialog({
             title: type === 'expense' ? '📉 记一笔支出' : '📈 记一笔收入',
             fields: [
                 { key: 'amount', label: '金额 (¥)', type: 'number', placeholder: '0.00' },
-                { key: 'category', label: '分类（可选，留空默认"其他"）', placeholder: cats.join(' / ') },
+                { key: 'category', label: '分类', options: CATEGORIES[type] },
                 { key: 'note', label: '备注', placeholder: '可选' }
             ],
             submitText: '保存'
         });
         if (r.cancelled || !r.values.amount) return;
-        let category = r.values.category;
-        if (!category || !cats.includes(category)) category = '💡 其他';
         await dbAdd('finance_records', {
             id: genId(), type, amount: parseFloat(r.values.amount),
-            category, date: date.today(), note: r.values.note, createdAt: date.now()
+            category: r.values.category, date: date.today(), note: r.values.note, createdAt: date.now()
         });
         toast('已保存', 'success');
     }

@@ -122,12 +122,29 @@ function formDialog({ title, fields, submitText = '确定', cancelText = '取消
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-        const fieldHtml = fields.map(f => `
-            <div class="field">
-                ${f.label ? `<label class="field-label">${f.label}</label>` : ''}
-                <input class="input" id="fd-${f.key}" type="${f.type || 'text'}" placeholder="${f.placeholder || ''}" value="${f.default != null ? f.default : ''}">
-            </div>
-        `).join('');
+        const fieldHtml = fields.map(f => {
+            if (f.options) {
+                // select 类型字段
+                const opts = f.options.map(o => {
+                    const val = typeof o === 'object' ? o.value : o;
+                    const txt = typeof o === 'object' ? o.label : o;
+                    const sel = val === f.default ? 'selected' : '';
+                    return `<option value="${escapeHtml(val)}" ${sel}>${escapeHtml(txt)}</option>`;
+                }).join('');
+                return `
+                    <div class="field">
+                        ${f.label ? `<label class="field-label">${f.label}</label>` : ''}
+                        <select class="select" id="fd-${f.key}">${opts}</select>
+                    </div>
+                `;
+            }
+            return `
+                <div class="field">
+                    ${f.label ? `<label class="field-label">${f.label}</label>` : ''}
+                    <input class="input" id="fd-${f.key}" type="${f.type || 'text'}" placeholder="${f.placeholder || ''}" value="${f.default != null ? f.default : ''}">
+                </div>
+            `;
+        }).join('');
         overlay.innerHTML = `
             <div class="card" style="max-width:440px;width:100%">
                 <div class="card-title"><span>${title}</span><button class="btn btn-sm btn-ghost" id="fd-close">✕</button></div>
