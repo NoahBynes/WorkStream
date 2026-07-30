@@ -1,5 +1,5 @@
-// 财务规划 - 收支记账 + 债务管理 + 分类统计 + 月度报表
-import { dbGetAll, dbGetByIndex, dbAdd, dbPut, dbDelete, genId } from '../db.js';
+// 财务规划 - 收支记账 + 总资产 + 分类统计 + 月度报表
+import { dbGetAll, dbGetByIndex, dbAdd, dbDelete, genId } from '../db.js';
 import { date, escapeHtml, toast, formatMoney, confirmDialog, store, formDialog } from '../store.js';
 
 const CATEGORIES = {
@@ -7,12 +7,13 @@ const CATEGORIES = {
     income: ['💰 工资', '💼 兼职', '📈 投资', '🎁 红包', '💡 其他']
 };
 
+let currentType = 'expense';
+
 export default async function renderFinance(container) {
     const monthStart = date.monthStart();
     const monthEnd = date.monthEnd();
     const records = await dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(monthStart, monthEnd + '\uffff'));
     const allRecords = await dbGetAll('finance_records');
-    const debts = await dbGetAll('finance_debts');
     const budget = store.get('finance_budget', { monthly: 0 });
 
     const income = records.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
@@ -20,20 +21,31 @@ export default async function renderFinance(container) {
     const balance = income - expense;
     const budgetUsed = budget.monthly > 0 ? (expense / budget.monthly * 100) : 0;
 
-    // 债务统计
-    const activeDebts = debts.filter(d => d.status === 'active');
-    const totalDebt = activeDebts.reduce((s, d) => s + (d.totalAmount - (d.paidAmount || 0)), 0);
-    const today = date.today();
-    const dueSoon = activeDebts.filter(d => d.dueDate && d.dueDate >= today && d.dueDate <= date.daysAgo(-7)).length;
-    const overdue = activeDebts.filter(d => d.dueDate && d.dueDate < today).length;
+    // 总资产：历史累计收入 - 支出
+    const totalIncome = allRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const totalExpense = allRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const totalAssets = totalIncome - totalExpense;
 
     container.innerHTML = `
         <div class="page-header">
             <div>
                 <div class="page-title">💰 财务规划</div>
-                <div class="page-subtitle">${date.format(monthStart).slice(0, 7)} · 收支记账 · 债务管理 · 预算</div>
+                <div class="page-subtitle">${date.format(monthStart).slice(0, 7)} · 收支记账 · 总资产 · 预算</div>
             </div>
             <button class="btn btn-secondary" id="btn-budget">⚙️ 预算设置</button>
+        </div>
+
+        <div class="card mb-4" style="background:linear-gradient(135deg, var(--primary), var(--primary-hover));color:#fff;border:none">
+            <div class="flex-between">
+                <div>
+                    <div style="font-size:13px;opacity:0.85">💰 总资产</div>
+                    <div style="font-size:32px;font-weight:700;margin-top:6px">${formatMoney(totalAssets)}</div>
+                    <div style="font-size:12px;opacity:0.85;margin-top:6px">
+                        累计收入 ${formatMoney(totalIncome)} · 累计支出 ${formatMoney(totalExpense)}
+                    </div>
+                </div>
+                <div style="font-size:48px;opacity:0.3">💼</div>
+            </div>
         </div>
 
         <div class="grid grid-4 mb-4">
@@ -98,34 +110,6 @@ export default async function renderFinance(container) {
 
         <div class="card mt-4">
             <div class="card-title">
-                <span>💳 债务管理</span>
-                <div class="actions">
-                    <span class="text-muted text-sm">待还 ${formatMoney(totalDebt)}</span>
-                    <button class="btn btn-sm" id="btn-add-debt">➕ 添加债务</button>
-                </div>
-            </div>
-            <div class="grid grid-3 mb-3">
-                <div class="stat-card">
-                    <div class="stat-label">待还总额</div>
-                    <div class="stat-value text-danger">${formatMoney(totalDebt)}</div>
-                    <div class="stat-trend">${activeDebts.length} 笔进行中</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">即将到期</div>
-                    <div class="stat-value ${dueSoon > 0 ? 'text-warning' : ''}">${dueSoon}</div>
-                    <div class="stat-trend">7 天内到期</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">已逾期</div>
-                    <div class="stat-value ${overdue > 0 ? 'text-danger' : ''}">${overdue}</div>
-                    <div class="stat-trend">需尽快处理</div>
-                </div>
-            </div>
-            <div id="debt-list"></div>
-        </div>
-
-        <div class="card mt-4">
-            <div class="card-title">
                 <span>📋 本月明细</span>
                 <span class="text-muted text-sm">共 ${records.length} 条</span>
             </div>
@@ -138,10 +122,10 @@ export default async function renderFinance(container) {
         </div>
     `;
 
-    updateCategoryOptions('expense');
+    // 关键修复：用 currentType 同步 UI 状态，避免 refresh 后 UI 与状态不一致
+    switchType(currentType);
     renderCategoryChart(records);
     renderRecordTable(records);
-    renderDebtList(debts);
     bindEvents();
 }
 
@@ -205,144 +189,6 @@ function renderRecordTable(records) {
     `).join('');
 }
 
-// ============ 债务管理 ============
-function renderDebtList(debts) {
-    const el = document.getElementById('debt-list');
-    if (!el) return;
-    const today = date.today();
-    const sorted = debts.sort((a, b) => {
-        if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
-        return (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
-    });
-    if (sorted.length === 0) {
-        el.innerHTML = '<div class="empty"><div class="empty-icon">💳</div><div>暂无债务记录</div></div>';
-        return;
-    }
-    el.innerHTML = sorted.map(d => {
-        const remaining = d.totalAmount - (d.paidAmount || 0);
-        const paidPercent = d.totalAmount > 0 ? ((d.paidAmount || 0) / d.totalAmount * 100) : 0;
-        const isOverdue = d.status === 'active' && d.dueDate && d.dueDate < today;
-        const isDueSoon = d.status === 'active' && d.dueDate && d.dueDate >= today && d.dueDate <= date.daysAgo(-7);
-        const isDone = d.status === 'paid' || remaining <= 0;
-        let statusTag = '';
-        if (isDone) statusTag = '<span class="tag" style="background:var(--success);color:#fff">✅ 已还清</span>';
-        else if (isOverdue) statusTag = '<span class="tag" style="background:var(--danger);color:#fff">⚠️ 已逾期</span>';
-        else if (isDueSoon) statusTag = '<span class="tag" style="background:var(--warning);color:#fff">⏰ 即将到期</span>';
-        else statusTag = '<span class="tag">进行中</span>';
-
-        return `
-            <div class="list-item" style="flex-direction:column;align-items:stretch;${isDone ? 'opacity:0.6' : ''}">
-                <div class="flex-between w-full">
-                    <div style="flex:1">
-                        <div class="font-bold">${escapeHtml(d.name)} ${statusTag}</div>
-                        <div class="text-sm text-muted">
-                            ${d.creditor ? `债权人：${escapeHtml(d.creditor)} · ` : ''}
-                            ${d.dueDate ? `到期：${date.format(d.dueDate)}` : '无到期日'}
-                            ${d.note ? ` · ${escapeHtml(d.note)}` : ''}
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-danger font-bold">${formatMoney(remaining)}</div>
-                        <div class="text-sm text-muted">/ ${formatMoney(d.totalAmount)}</div>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <div class="progress"><div class="progress-bar" style="width:${paidPercent}%;background:${isDone ? 'var(--success)' : 'var(--primary)'}"></div></div>
-                    <div class="flex-between text-sm text-muted mt-1">
-                        <span>已还 ${formatMoney(d.paidAmount || 0)} (${paidPercent.toFixed(0)}%)</span>
-                    </div>
-                </div>
-                ${!isDone ? `
-                    <div class="flex gap-2 mt-2">
-                        <button class="btn btn-sm flex-1" data-repay="${d.id}">💰 还款</button>
-                        <button class="btn btn-sm btn-ghost" data-edit-debt="${d.id}">编辑</button>
-                        <button class="btn btn-sm btn-ghost" data-del-debt="${d.id}">删除</button>
-                    </div>
-                ` : `
-                    <div class="flex gap-2 mt-2 justify-end">
-                        <button class="btn btn-sm btn-ghost" data-edit-debt="${d.id}">编辑</button>
-                        <button class="btn btn-sm btn-ghost" data-del-debt="${d.id}">删除</button>
-                    </div>
-                `}
-            </div>
-        `;
-    }).join('');
-
-    el.querySelectorAll('[data-repay]').forEach(btn => {
-        btn.addEventListener('click', () => repayDebt(debts.find(d => d.id === btn.dataset.repay)));
-    });
-    el.querySelectorAll('[data-edit-debt]').forEach(btn => {
-        btn.addEventListener('click', () => editDebt(debts.find(d => d.id === btn.dataset.editDebt)));
-    });
-    el.querySelectorAll('[data-del-debt]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (await confirmDialog('删除此债务记录？')) {
-                await dbDelete('finance_debts', btn.dataset.delDebt);
-                toast('已删除');
-                refresh();
-            }
-        });
-    });
-}
-
-async function addDebt(existing) {
-    const r = await formDialog({
-        title: existing ? '✏️ 编辑债务' : '➕ 添加债务',
-        fields: [
-            { key: 'name', label: '债务名称', default: existing?.name || '', placeholder: '如 花呗/信用卡/借款' },
-            { key: 'creditor', label: '债权人（可选）', default: existing?.creditor || '', placeholder: '如 某某银行/张三' },
-            { key: 'totalAmount', label: '债务总额 (¥)', type: 'number', default: existing?.totalAmount || '', placeholder: '0.00' },
-            { key: 'paidAmount', label: '已还金额 (¥)', type: 'number', default: existing?.paidAmount || '0' },
-            { key: 'dueDate', label: '到期日', type: 'date', default: existing?.dueDate || '' },
-            { key: 'note', label: '备注', default: existing?.note || '', placeholder: '可选' }
-        ],
-        submitText: existing ? '保存' : '添加'
-    });
-    if (r.cancelled || !r.values.name || !r.values.totalAmount) return;
-    const data = {
-        name: r.values.name, creditor: r.values.creditor,
-        totalAmount: parseFloat(r.values.totalAmount),
-        paidAmount: parseFloat(r.values.paidAmount) || 0,
-        dueDate: r.values.dueDate, note: r.values.note,
-        status: (parseFloat(r.values.paidAmount) || 0) >= parseFloat(r.values.totalAmount) ? 'paid' : 'active'
-    };
-    if (existing) {
-        await dbPut('finance_debts', { ...existing, ...data });
-    } else {
-        await dbAdd('finance_debts', { id: genId(), ...data, createdAt: date.now() });
-    }
-    toast(existing ? '已更新' : '债务已添加', 'success');
-    refresh();
-}
-
-async function editDebt(debt) {
-    await addDebt(debt);
-}
-
-async function repayDebt(debt) {
-    const remaining = debt.totalAmount - (debt.paidAmount || 0);
-    const r = await formDialog({
-        title: `💰 还款 - ${debt.name}`,
-        fields: [
-            { key: 'amount', label: `还款金额 (¥) · 待还 ${formatMoney(remaining)}`, type: 'number', default: String(remaining), placeholder: '0.00' }
-        ],
-        submitText: '确认还款'
-    });
-    if (r.cancelled || !r.values.amount) return;
-    const repayAmount = parseFloat(r.values.amount);
-    if (repayAmount <= 0 || repayAmount > remaining) {
-        toast('还款金额无效（不能超过待还金额）', 'error');
-        return;
-    }
-    debt.paidAmount = (debt.paidAmount || 0) + repayAmount;
-    if (debt.paidAmount >= debt.totalAmount) debt.status = 'paid';
-    await dbPut('finance_debts', debt);
-    toast(`已还款 ${formatMoney(repayAmount)}`, 'success');
-    refresh();
-}
-
-let currentType = 'expense';
-
 function bindEvents() {
     document.getElementById('type-expense').addEventListener('click', () => switchType('expense'));
     document.getElementById('type-income').addEventListener('click', () => switchType('income'));
@@ -390,16 +236,15 @@ function bindEvents() {
         toast('预算已更新', 'success');
         refresh();
     });
-
-    // 添加债务
-    document.getElementById('btn-add-debt').addEventListener('click', () => addDebt());
 }
 
 function switchType(type) {
     currentType = type;
     updateCategoryOptions(type);
-    document.getElementById('type-expense').className = `btn flex-1${type === 'expense' ? '' : ' btn-secondary'}`;
-    document.getElementById('type-income').className = `btn flex-1${type === 'income' ? '' : ' btn-secondary'}`;
+    const expBtn = document.getElementById('type-expense');
+    const incBtn = document.getElementById('type-income');
+    if (expBtn) expBtn.className = `btn flex-1${type === 'expense' ? '' : ' btn-secondary'}`;
+    if (incBtn) incBtn.className = `btn flex-1${type === 'income' ? '' : ' btn-secondary'}`;
 }
 
 async function refresh() {

@@ -55,7 +55,6 @@ export default async function renderDashboard(container) {
             <button class="quick-bar-item" data-qr="weight"><span class="qb-icon">⚖️</span><span class="qb-label">记体重</span></button>
             <button class="quick-bar-item" data-qr="expense"><span class="qb-icon">📉</span><span class="qb-label">记支出</span></button>
             <button class="quick-bar-item" data-qr="income"><span class="qb-icon">📈</span><span class="qb-label">记收入</span></button>
-            <button class="quick-bar-item" data-qr="debt"><span class="qb-icon">💳</span><span class="qb-label">记债务</span></button>
         </div>
 
         <div class="grid grid-4 mb-4">

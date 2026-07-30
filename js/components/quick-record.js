@@ -22,7 +22,6 @@ export function openQuickRecord() {
                 <button class="qr-item" data-type="weight"><span class="qr-icon">⚖️</span><span>记体重</span></button>
                 <button class="qr-item" data-type="expense"><span class="qr-icon">📉</span><span>记支出</span></button>
                 <button class="qr-item" data-type="income"><span class="qr-icon">📈</span><span>记收入</span></button>
-                <button class="qr-item" data-type="debt"><span class="qr-icon">💳</span><span>记债务</span></button>
             </div>
         </div>
     `;
@@ -104,28 +103,6 @@ async function handleRecord(type) {
             category, date: date.today(), note: r.values.note, createdAt: date.now()
         });
         toast('已保存', 'success');
-    } else if (type === 'debt') {
-        const r = await formDialog({
-            title: '💳 记一笔债务',
-            fields: [
-                { key: 'name', label: '债务名称', placeholder: '如 花呗/信用卡/借款' },
-                { key: 'creditor', label: '债权人（可选）', placeholder: '如 某某银行/张三' },
-                { key: 'totalAmount', label: '债务总额 (¥)', type: 'number', placeholder: '0.00' },
-                { key: 'paidAmount', label: '已还金额 (¥)', type: 'number', default: '0' },
-                { key: 'dueDate', label: '到期日', type: 'date' },
-                { key: 'note', label: '备注', placeholder: '可选' }
-            ],
-            submitText: '保存'
-        });
-        if (r.cancelled || !r.values.name || !r.values.totalAmount) return;
-        await dbAdd('finance_debts', {
-            id: genId(), name: r.values.name, creditor: r.values.creditor,
-            totalAmount: parseFloat(r.values.totalAmount),
-            paidAmount: parseFloat(r.values.paidAmount) || 0,
-            dueDate: r.values.dueDate, note: r.values.note,
-            status: 'active', createdAt: date.now()
-        });
-        toast('债务已记录', 'success');
     }
 
     // 触发页面刷新（如果在对应页面）
