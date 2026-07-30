@@ -373,15 +373,15 @@ async function editDayPlan(weekday, weeklyPlan, onUpdate) {
                     <div class="flex gap-2 mb-2">
                         <input class="input" id="ep-name" placeholder="项目名，如 深蹲" required>
                     </div>
-                    <div class="flex gap-2">
-                        <input class="input" id="ep-sets" type="number" placeholder="组" value="3" style="width:60px">
-                        <input class="input" id="ep-reps" type="number" placeholder="数量" value="10" style="width:70px">
-                        <select class="select" id="ep-unit" style="width:80px">
+                    <div class="flex gap-2" style="flex-wrap:wrap">
+                        <input class="input" id="ep-sets" type="number" placeholder="组" value="3" style="width:60px;flex:0 0 auto">
+                        <input class="input" id="ep-reps" type="number" placeholder="数量" value="10" style="width:70px;flex:0 0 auto">
+                        <select class="select" id="ep-unit" style="width:80px;flex:0 0 auto">
                             <option value="次">次</option>
                             <option value="分钟">分钟</option>
                         </select>
-                        <input class="input" id="ep-weight" type="number" step="0.5" placeholder="kg" style="width:70px" title="重量（可选）">
-                        <button class="btn" type="submit">添加</button>
+                        <input class="input" id="ep-weight" type="number" step="0.5" placeholder="kg" style="width:70px;flex:0 0 auto" title="重量（可选）">
+                        <button class="btn" type="submit" style="flex:1;min-width:60px">添加</button>
                     </div>
                 </form>
                 <button class="btn w-full" id="ep-save">保存</button>
