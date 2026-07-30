@@ -176,6 +176,7 @@ html, body {
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid > * { min-width: 0; }  /* 允许子项收缩，防止内容撑开导致溢出 */
 
 /* ============ 统计卡 ============ */
 .stat-card {
@@ -341,8 +342,8 @@ html, body {
 
 /* ============ 响应式 ============ */
 @media (max-width: 900px) {
-    .grid-4 { grid-template-columns: repeat(2, 1fr); }
-    .grid-3 { grid-template-columns: 1fr; }
+    .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 768px) {
@@ -361,7 +362,7 @@ html, body {
         padding-right: 16px;
         padding-bottom: 24px;
     }
-    .grid-2, .grid-4 { grid-template-columns: 1fr; }
+    .grid-2, .grid-4 { grid-template-columns: minmax(0, 1fr); }
     .stat-value { font-size: 22px; }
 }
 
