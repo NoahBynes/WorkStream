@@ -1,5 +1,5 @@
 // Service Worker - 离线缓存（网络优先策略，避免代码更新后仍返回旧版本）
-const CACHE_NAME = 'workstream-v35';
+const CACHE_NAME = 'workstream-v36';
 const CACHE_ASSETS = [
     './',
     './index.html',
@@ -13,7 +13,9 @@ const CACHE_ASSETS = [
     './js/router.js',
     './js/db.js',
     './js/store.js',
+    './js/sync.js',
     './js/components/quick-record.js',
+    './js/components/sync-panel.js',
     './js/pages/dashboard.js',
     './js/pages/study.js',
     './js/pages/fitness.js',

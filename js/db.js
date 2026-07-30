@@ -56,12 +56,22 @@ function openDB() {
 }
 
 // 通用 CRUD - 使用 tx.oncomplete 确保事务真正完成
+// 写操作完成后通过全局事件通知 sync 模块（解耦，避免循环依赖）
+
+function notifyChange(type, storeName, payload) {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('db-change', { detail: { type, storeName, payload } }));
+}
+
 async function dbAdd(storeName, data) {
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).add(data);
-        tx.oncomplete = () => resolve(data);
+        tx.oncomplete = () => {
+            notifyChange('put', storeName, data);
+            resolve(data);
+        };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error('事务已中止'));
     });
@@ -72,7 +82,10 @@ async function dbPut(storeName, data) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).put(data);
-        tx.oncomplete = () => resolve(data);
+        tx.oncomplete = () => {
+            notifyChange('put', storeName, data);
+            resolve(data);
+        };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error('事务已中止'));
     });
@@ -93,7 +106,10 @@ async function dbDelete(storeName, id) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).delete(id);
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+            notifyChange('delete', storeName, id);
+            resolve();
+        };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error('事务已中止'));
     });

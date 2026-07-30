@@ -3,6 +3,8 @@ import { registerRoute, initRouter, navigate } from './router.js';
 import { getTheme, setTheme, toggleTheme, toast, confirmDialog, date } from './store.js';
 import { exportAllData, importAllData } from './db.js';
 import { openQuickRecord } from './components/quick-record.js';
+import { openSyncPanel, updateSyncButton } from './components/sync-panel.js';
+import { restoreSession } from './sync.js';
 import renderDashboard from './pages/dashboard.js';
 import renderStudy from './pages/study.js';
 import renderFitness from './pages/fitness.js';
@@ -159,6 +161,9 @@ function bindGlobalEvents() {
         }
         e.target.value = '';
     });
+
+    // 云同步
+    document.getElementById('btn-sync')?.addEventListener('click', () => openSyncPanel());
 }
 
 // 注册 Service Worker
@@ -177,10 +182,17 @@ function registerSW() {
 }
 
 // 启动
-function start() {
+async function start() {
     bindGlobalEvents();
     registerSW();
     initRouter();
+    // 恢复 Supabase 登录会话并启动自动同步
+    try {
+        await restoreSession();
+        await updateSyncButton();
+    } catch (err) {
+        console.warn('同步会话恢复失败（不影响使用）:', err);
+    }
 }
 
 if (document.readyState === 'loading') {
