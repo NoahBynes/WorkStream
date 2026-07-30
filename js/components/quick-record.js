@@ -20,9 +20,8 @@ export function openQuickRecord() {
             <div class="qr-grid">
                 <button class="qr-item" data-type="task"><span class="qr-icon">📚</span><span>学习任务</span></button>
                 <button class="qr-item" data-type="weight"><span class="qr-icon">⚖️</span><span>记体重</span></button>
-                <button class="qr-item" data-type="expense"><span class="qr-icon">�</span><span>记支出</span></button>
-                <button class="qr-item" data-type="income"><span class="qr-icon">�</span><span>记收入</span></button>
-                <button class="qr-item" data-type="meal"><span class="qr-icon">🍎</span><span>记饮食</span></button>
+                <button class="qr-item" data-type="expense"><span class="qr-icon">📉</span><span>记支出</span></button>
+                <button class="qr-item" data-type="income"><span class="qr-icon">📈</span><span>记收入</span></button>
                 <button class="qr-item" data-type="debt"><span class="qr-icon">💳</span><span>记债务</span></button>
             </div>
         </div>
@@ -105,23 +104,6 @@ async function handleRecord(type) {
             category, date: date.today(), note: r.values.note, createdAt: date.now()
         });
         toast('已保存', 'success');
-    } else if (type === 'meal') {
-        // 饮食记录简化版：食物名+卡路里
-        const r = await formDialog({
-            title: '🍎 记录饮食',
-            fields: [
-                { key: 'food', label: '食物', placeholder: '例如 米饭' },
-                { key: 'calories', label: '卡路里 (千卡)', type: 'number', placeholder: '例如 200' },
-                { key: 'amount', label: '分量', placeholder: '例如 1 碗' }
-            ],
-            submitText: '保存'
-        });
-        if (r.cancelled || !r.values.food) return;
-        await dbAdd('fitness_meals', {
-            id: genId(), food: r.values.food, calories: parseFloat(r.values.calories) || 0,
-            amount: r.values.amount, mealTime: '手动', date: date.today(), createdAt: date.now()
-        });
-        toast('饮食已记录', 'success');
     } else if (type === 'debt') {
         const r = await formDialog({
             title: '💳 记一笔债务',

@@ -9,17 +9,24 @@ export default async function renderDashboard(container) {
     const monthEnd = date.monthEnd();
 
     // 并行加载各模块数据
-    const [tasks, fitness, financeAll, newsFav] = await Promise.all([
+    const [tasks, routines, fitness, financeAll, newsFav] = await Promise.all([
         dbGetAll('study_tasks'),
+        dbGetAll('study_routines'),
         dbGetAll('fitness_records'),
         dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(monthStart, monthEnd + '\uffff')),
         dbGetAll('news_favorites')
     ]);
 
-    // 学习：今日待办（排除固定任务打卡记录，避免重复计数）
+    // 学习：今日待办（额外任务 + 固定任务合并计数）
     const todayTasks = tasks.filter(t => !t.done && t.date === today && !t.routineId);
     const doneToday = tasks.filter(t => t.done && t.date === today && !t.routineId).length;
-    const totalToday = todayTasks.length + doneToday;
+    // 固定任务：启用的 routines 中今日已打卡的数量
+    const enabledRoutines = routines.filter(r => r.enabled);
+    const routineDoneCount = enabledRoutines.filter(r =>
+        tasks.some(t => t.routineId === r.id && t.date === today && t.done)
+    ).length;
+    const totalToday = todayTasks.length + doneToday + enabledRoutines.length;
+    const totalDoneToday = doneToday + routineDoneCount;
 
     // 身材：最新体重
     const weights = fitness.filter(f => f.type === 'weight').sort((a, b) => b.date.localeCompare(a.date));
@@ -48,7 +55,6 @@ export default async function renderDashboard(container) {
             <button class="quick-bar-item" data-qr="weight"><span class="qb-icon">⚖️</span><span class="qb-label">记体重</span></button>
             <button class="quick-bar-item" data-qr="expense"><span class="qb-icon">📉</span><span class="qb-label">记支出</span></button>
             <button class="quick-bar-item" data-qr="income"><span class="qb-icon">📈</span><span class="qb-label">记收入</span></button>
-            <button class="quick-bar-item" data-qr="meal"><span class="qb-icon">🍎</span><span class="qb-label">记饮食</span></button>
             <button class="quick-bar-item" data-qr="debt"><span class="qb-icon">💳</span><span class="qb-label">记债务</span></button>
         </div>
 
@@ -56,8 +62,8 @@ export default async function renderDashboard(container) {
             <div class="stat-card">
                 <div class="stat-label">今日待办</div>
                 <div class="stat-icon">📚</div>
-                <div class="stat-value">${totalToday}</div>
-                <div class="stat-trend">已完成 ${doneToday} / ${totalToday}</div>
+                <div class="stat-value">${totalDoneToday}<span class="text-lg text-muted">/${totalToday}</span></div>
+                <div class="stat-trend">已完成 ${totalDoneToday} / ${totalToday}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">最新体重</div>

@@ -1,5 +1,5 @@
-// 身材管理 - 周循环训练任务 + 体重 + 卡路里计算(AI识别) + 趋势图
-import { dbGetAll, dbGetByIndex, dbAdd, dbPut, dbDelete, genId } from '../db.js';
+// 身材管理 - 周循环训练任务 + 体重 + 趋势图
+import { dbGetAll, dbAdd, dbPut, dbDelete, genId } from '../db.js';
 import { date, escapeHtml, toast, confirmDialog, store, formDialog } from '../store.js';
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -27,7 +27,6 @@ export default async function renderFitness(container) {
 
     const records = await dbGetAll('fitness_records');
     const workoutTasks = await dbGetAll('fitness_workout_tasks');
-    const meals = await dbGetByIndex('fitness_meals', 'date', IDBKeyRange.bound(date.today(), date.today() + '\uffff'));
 
     const weights = records.filter(r => r.type === 'weight').sort((a, b) => a.date.localeCompare(b.date));
 
@@ -35,9 +34,6 @@ export default async function renderFitness(container) {
     const latestWeight = weights[weights.length - 1];
     const prevWeight = weights[weights.length - 2];
     const today = date.today();
-
-    const todayCalories = meals.reduce((s, m) => s + (m.calories || 0), 0);
-    const calorieGoal = store.get('calorie_goal', 2000);
 
     let weightChange = 0;
     if (prevWeight && latestWeight) weightChange = latestWeight.value - prevWeight.value;
@@ -56,7 +52,7 @@ export default async function renderFitness(container) {
         <div class="page-header">
             <div>
                 <div class="page-title">💪 身材管理</div>
-                <div class="page-subtitle">周训练 · 体重 · 卡路里 · 趋势追踪</div>
+                <div class="page-subtitle">周训练 · 体重 · 趋势追踪</div>
             </div>
             <div class="flex gap-2">
                 <button class="btn btn-secondary" id="btn-plan-manage">🗓️ 周计划</button>
@@ -64,7 +60,7 @@ export default async function renderFitness(container) {
             </div>
         </div>
 
-        <div class="grid grid-3 mb-4">
+        <div class="grid grid-2 mb-4">
             <div class="stat-card">
                 <div class="stat-label">今日训练</div>
                 <div class="stat-icon">📋</div>
@@ -78,13 +74,6 @@ export default async function renderFitness(container) {
                 <div class="stat-trend ${weightChange > 0 ? 'down' : weightChange < 0 ? 'up' : ''}">
                     ${prevWeight ? `${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} kg` : '暂无对比'}
                 </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">今日卡路里</div>
-                <div class="stat-icon">🍎</div>
-                <div class="stat-value ${todayCalories > calorieGoal ? 'text-danger' : ''}">${todayCalories}</div>
-                <div class="stat-trend">目标 ${calorieGoal} 千卡</div>
-                <div class="progress mt-2"><div class="progress-bar" style="width:${Math.min(todayCalories / calorieGoal * 100, 100)}%;background:${todayCalories > calorieGoal ? 'var(--danger)' : 'var(--fitness)'}"></div></div>
             </div>
         </div>
 
@@ -125,56 +114,6 @@ export default async function renderFitness(container) {
             </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-title">
-                <span>🍎 卡路里计算 · AI 识别</span>
-                <div class="actions">
-                    <button class="btn btn-sm btn-ghost" id="btn-ai-settings">⚙️ API 设置</button>
-                </div>
-            </div>
-            <div class="calorie-section">
-                <div>
-                    <div class="flex gap-2 mb-3">
-                        <button class="btn flex-1" id="btn-photo">📷 拍照/上传</button>
-                        <button class="btn btn-secondary flex-1" id="btn-ai-recognize" disabled>✨ AI 识别</button>
-                    </div>
-                    <input type="file" id="meal-photo-input" accept="image/*" capture="environment" style="display:none">
-                    <div id="photo-preview" style="display:none" class="mb-3">
-                        <img id="meal-photo" class="meal-photo" alt="餐食照片">
-                        <div class="text-muted text-sm mt-2">📸 已上传照片，点击"AI 识别"自动分析食物</div>
-                    </div>
-                    <div id="ai-result" class="mb-3"></div>
-                </div>
-                <div>
-                    <div class="field">
-                        <label class="field-label">食物名称</label>
-                        <input class="input" id="meal-food" placeholder="如 米饭/鸡胸肉">
-                    </div>
-                    <div class="flex gap-2">
-                        <div class="field" style="flex:1">
-                            <label class="field-label">份数</label>
-                            <input class="input" type="number" id="meal-amount" value="1" min="0.5" step="0.5">
-                        </div>
-                        <div class="field" style="flex:1">
-                            <label class="field-label">单份卡路里</label>
-                            <input class="input" type="number" id="meal-cal" placeholder="0">
-                        </div>
-                    </div>
-                    <button class="btn w-full" id="btn-add-meal">➕ 添加到今日饮食</button>
-                    <div class="card mt-3" style="padding:12px;background:var(--surface-2)">
-                        <div class="flex-between">
-                            <span class="text-sm">今日合计</span>
-                            <span class="font-bold text-lg ${todayCalories > calorieGoal ? 'text-danger' : ''}">${todayCalories} / <span id="calorie-goal-display" style="text-decoration:underline;cursor:pointer">${calorieGoal}</span> 千卡</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="card-title"><span>📋 今日饮食记录</span></div>
-                <div id="meal-list" class="list"></div>
-            </div>
-        </div>
-
         <div class="card">
             <div class="card-title"><span>📅 近期记录</span></div>
             <div id="record-list" class="list"></div>
@@ -183,7 +122,6 @@ export default async function renderFitness(container) {
 
     renderWeightChart(weights, profile.targetWeight);
     renderPlanContent(weeklyPlan, workoutTasks, planState.selectedWeekday);
-    renderMealList(meals);
     renderRecordList(records);
     bindEvents(weeklyPlan, workoutTasks);
 }
@@ -285,153 +223,6 @@ function renderWeightChart(weights, target) {
     });
 }
 
-// ============ 卡路里计算 ============
-let currentMealPhoto = null;
-let aiRecognizedFoods = []; // AI 识别结果暂存
-
-// AI API 设置（存 localStorage）
-function getAISettings() {
-    return store.get('ai_food_settings', {
-        endpoint: 'https://api.openai.com/v1/chat/completions',
-        apiKey: '',
-        model: 'gpt-4o'
-    });
-}
-
-function setAISettings(settings) {
-    store.set('ai_food_settings', settings);
-}
-
-// 调用 OpenAI 兼容 Vision API 识别食物
-async function recognizeFoodAI(imageDataUrl) {
-    const config = getAISettings();
-    if (!config.apiKey) {
-        toast('请先在 ⚙️ API 设置 中配置密钥', 'error');
-        return null;
-    }
-
-    const prompt = `请分析这张食物图片，识别其中的食物。返回 JSON 格式，包含 foods 数组，每个元素含 name(食物名称)、calories(单份卡路里，整数)、confidence(置信度0-1)。只返回纯JSON，不要其他文字。格式：{"foods":[{"name":"米饭","calories":200,"confidence":0.95}]}`;
-
-    try {
-        const resp = await fetch(config.endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            },
-            body: JSON.stringify({
-                model: config.model,
-                messages: [{
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: prompt },
-                        { type: 'image_url', image_url: { url: imageDataUrl } }
-                    ]
-                }],
-                max_tokens: 500,
-                temperature: 0.3
-            })
-        });
-
-        if (!resp.ok) {
-            const errText = await resp.text();
-            throw new Error(`API ${resp.status}: ${errText.slice(0, 200)}`);
-        }
-
-        const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content || '';
-
-        // 提取 JSON（兼容 markdown 代码块包裹）
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('AI 返回格式异常');
-        const result = JSON.parse(jsonMatch[0]);
-
-        if (!result.foods || !Array.isArray(result.foods)) throw new Error('AI 返回数据缺少 foods 字段');
-        return result;
-    } catch (err) {
-        console.error('AI 识别失败:', err);
-        toast('AI 识别失败: ' + err.message, 'error');
-        return null;
-    }
-}
-
-// 渲染 AI 识别结果
-function renderAIResult(result) {
-    const el = document.getElementById('ai-result');
-    if (!el || !result) return;
-    aiRecognizedFoods = result.foods || [];
-
-    el.innerHTML = `
-        <div class="card" style="padding:12px;background:var(--primary-light)">
-            <div class="font-bold mb-2">✨ AI 识别到 ${aiRecognizedFoods.length} 种食物（点击选用）</div>
-            ${aiRecognizedFoods.map((f, i) => `
-                <div class="food-item" data-ai-idx="${i}" style="cursor:pointer">
-                    <span>${escapeHtml(f.name)} <span class="text-muted text-sm">${Math.round((f.confidence || 0) * 100)}%</span></span>
-                    <span class="text-success">${f.calories || 0} 千卡</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
-
-    el.querySelectorAll('[data-ai-idx]').forEach(item => {
-        item.addEventListener('click', () => {
-            const food = aiRecognizedFoods[parseInt(item.dataset.aiIdx)];
-            document.getElementById('meal-food').value = food.name;
-            document.getElementById('meal-cal').value = food.calories || 0;
-            document.getElementById('meal-amount').value = '1';
-            toast(`已选 ${food.name}`, 'info', 1500);
-        });
-    });
-}
-
-// API 设置弹窗
-async function showAISettings() {
-    const config = getAISettings();
-    const r = await formDialog({
-        title: '⚙️ AI 识别 API 设置',
-        fields: [
-            { key: 'endpoint', label: 'API 接口地址', default: config.endpoint, placeholder: 'https://api.openai.com/v1/chat/completions' },
-            { key: 'apiKey', label: 'API Key', default: config.apiKey, placeholder: 'sk-...' },
-            { key: 'model', label: '模型名称', default: config.model, placeholder: 'gpt-4o / gemini-2.0-flash 等' }
-        ],
-        submitText: '保存'
-    });
-    if (r.cancelled) return;
-    setAISettings({
-        endpoint: r.values.endpoint || 'https://api.openai.com/v1/chat/completions',
-        apiKey: r.values.apiKey || '',
-        model: r.values.model || 'gpt-4o'
-    });
-    toast('API 设置已保存', 'success');
-}
-
-function renderMealList(meals) {
-    const el = document.getElementById('meal-list');
-    if (!el) return;
-    if (meals.length === 0) {
-        el.innerHTML = '<div class="empty text-sm">今天还没有饮食记录</div>';
-        return;
-    }
-    el.innerHTML = meals.map(m => `
-        <div class="list-item">
-            <span>🍎</span>
-            <div style="flex:1">
-                <div>${escapeHtml(m.food)} ${m.amount ? `× ${m.amount}` : ''}</div>
-                <div class="text-sm text-muted">${date.format(m.createdAt, true).slice(11)}${m.note ? ' · ' + escapeHtml(m.note) : ''}</div>
-            </div>
-            <span class="text-success font-bold">${m.calories} 千卡</span>
-            <button class="btn btn-sm btn-ghost" data-meal-del="${m.id}">删除</button>
-        </div>
-    `).join('');
-    el.querySelectorAll('[data-meal-del]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            await dbDelete('fitness_meals', btn.dataset.mealDel);
-            toast('已删除');
-            refresh();
-        });
-    });
-}
-
 function renderRecordList(records) {
     const el = document.getElementById('record-list');
     if (!el) return;
@@ -494,93 +285,16 @@ function bindEvents(weeklyPlan, workoutTasks) {
     // 目标设置
     document.getElementById('btn-profile').addEventListener('click', async () => {
         const profile = store.get('fitness_profile', { targetWeight: null, height: null });
-        const calorieGoal = store.get('calorie_goal', 2000);
         const r = await formDialog({
             title: '🎯 目标设置',
             fields: [
-                { key: 'targetWeight', label: '目标体重 (kg)', type: 'number', default: profile.targetWeight || '', placeholder: '例如 65' },
-                { key: 'calorieGoal', label: '每日卡路里目标 (千卡)', type: 'number', default: calorieGoal, placeholder: '例如 2000' }
+                { key: 'targetWeight', label: '目标体重 (kg)', type: 'number', default: profile.targetWeight || '', placeholder: '例如 65' }
             ],
             submitText: '保存'
         });
         if (r.cancelled) return;
         store.set('fitness_profile', { ...profile, targetWeight: isNaN(r.values.targetWeight) ? null : r.values.targetWeight });
-        store.set('calorie_goal', isNaN(r.values.calorieGoal) ? 2000 : r.values.calorieGoal);
         toast('目标已更新', 'success');
-        refresh();
-    });
-
-    // 食物搜索已移除（改用 AI 识别）
-
-    // 拍照/上传
-    document.getElementById('btn-photo').addEventListener('click', () => {
-        document.getElementById('meal-photo-input').click();
-    });
-    document.getElementById('meal-photo-input').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            currentMealPhoto = ev.target.result;
-            document.getElementById('meal-photo').src = currentMealPhoto;
-            document.getElementById('photo-preview').style.display = '';
-            document.getElementById('btn-ai-recognize').disabled = false;
-            toast('照片已上传，点击 AI 识别', 'success');
-        };
-        reader.readAsDataURL(file);
-        e.target.value = '';
-    });
-
-    // AI 识别
-    document.getElementById('btn-ai-recognize').addEventListener('click', async () => {
-        if (!currentMealPhoto) { toast('请先上传照片', 'error'); return; }
-        const btn = document.getElementById('btn-ai-recognize');
-        btn.disabled = true;
-        btn.textContent = '⏳ 识别中...';
-        const result = await recognizeFoodAI(currentMealPhoto);
-        btn.disabled = false;
-        btn.textContent = '✨ AI 识别';
-        if (result) {
-            renderAIResult(result);
-            toast(`识别到 ${result.foods.length} 种食物`, 'success');
-        }
-    });
-
-    // API 设置
-    document.getElementById('btn-ai-settings').addEventListener('click', showAISettings);
-
-    // 添加饮食
-    document.getElementById('btn-add-meal').addEventListener('click', async () => {
-        const food = document.getElementById('meal-food').value.trim();
-        const amount = parseFloat(document.getElementById('meal-amount').value) || 1;
-        const baseCal = parseInt(document.getElementById('meal-cal').value) || 0;
-        if (!food) { toast('请输入食物名称', 'error'); return; }
-        const calories = Math.round(baseCal * amount);
-        await dbAdd('fitness_meals', {
-            id: genId(), food, amount, calories, baseCalories: baseCal,
-            photo: currentMealPhoto, mealTime: '手动',
-            date: date.today(), createdAt: date.now()
-        });
-        toast(`已添加 ${food} ${calories} 千卡`, 'success');
-        currentMealPhoto = null;
-        document.getElementById('photo-preview').style.display = 'none';
-        document.getElementById('btn-ai-recognize').disabled = true;
-        refresh();
-    });
-
-    // 可编辑卡路里目标（点击数字编辑）
-    document.getElementById('calorie-goal-display')?.addEventListener('click', async () => {
-        const current = store.get('calorie_goal', 2000);
-        const r = await formDialog({
-            title: '🎯 每日卡路里目标',
-            fields: [
-                { key: 'goal', label: '每日卡路里目标 (千卡)', type: 'number', default: current, placeholder: '例如 2000' }
-            ],
-            submitText: '保存'
-        });
-        if (r.cancelled) return;
-        store.set('calorie_goal', isNaN(r.values.goal) ? 2000 : parseInt(r.values.goal));
-        toast('卡路里目标已更新', 'success');
         refresh();
     });
 }

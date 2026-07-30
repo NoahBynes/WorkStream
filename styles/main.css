@@ -173,9 +173,9 @@ html, body {
 
 /* ============ 网格 ============ */
 .grid { display: grid; gap: 16px; }
-.grid-2 { grid-template-columns: repeat(2, 1fr); }
-.grid-3 { grid-template-columns: repeat(3, 1fr); }
-.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 /* ============ 统计卡 ============ */
 .stat-card {
@@ -185,15 +185,17 @@ html, body {
     padding: 18px;
     box-shadow: var(--shadow-sm);
     transition: transform 0.15s, box-shadow 0.15s;
+    overflow: hidden;  /* 防止内容溢出导致 iOS 缩放 */
+    min-width: 0;      /* 允许 flex 子项收缩 */
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
 .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-.stat-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
-.stat-trend { font-size: 12px; margin-top: 6px; }
+.stat-value { font-size: 26px; font-weight: 700; line-height: 1.1; word-break: break-all; }
+.stat-trend { font-size: 12px; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stat-trend.up { color: var(--success); }
 .stat-trend.down { color: var(--danger); }
-.stat-icon { font-size: 20px; float: right; }
+.stat-icon { font-size: 20px; float: right; margin-left: 8px; }  /* margin-left 避免与数值重叠 */
 
 /* ============ 表单元素 ============ */
 .input, .select, .textarea {
@@ -522,24 +524,3 @@ html, body {
 .workout-task.done { opacity: 0.55; }
 .workout-task.done .wt-name { text-decoration: line-through; }
 
-/* ============ 卡路里计算器 ============ */
-.calorie-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 768px) { .calorie-section { grid-template-columns: 1fr; } }
-.food-picker {
-    max-height: 280px; overflow-y: auto; border: 1px solid var(--border);
-    border-radius: var(--radius-sm); background: var(--surface-2);
-}
-.food-item {
-    padding: 10px 12px; border-bottom: 1px solid var(--border);
-    display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-}
-.food-item:hover { background: var(--surface); }
-.food-item.selected { background: var(--primary-light); }
-.meal-photo {
-    width: 100%; max-height: 240px; object-fit: cover; border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-}
-.ai-badge {
-    display: inline-block; padding: 2px 8px; font-size: 10px; border-radius: 8px;
-    background: linear-gradient(135deg, #8b5cf6, #ec4899); color: #fff; font-weight: 600;
-}
