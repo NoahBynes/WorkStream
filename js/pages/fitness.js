@@ -150,12 +150,13 @@ function renderPlanContent(weeklyPlan, workoutTasks, weekday) {
                 const task = dayTasks.find(t => t.itemIndex === i);
                 const done = task && task.done;
                 const unit = item.unit || '次';
+                const weightStr = item.weight ? ` · ${item.weight} kg` : '';
                 return `
                     <div class="workout-task ${done ? 'done' : ''}">
                         ${isToday ? `<input type="checkbox" class="checkbox" data-plan-item="${i}" ${done ? 'checked' : ''}>` : '<span style="width:18px"></span>'}
                         <div style="flex:1">
                             <div class="wt-name">${escapeHtml(item.name)}</div>
-                            <div class="text-sm text-muted">${item.sets} 组 × ${item.reps} ${unit}</div>
+                            <div class="text-sm text-muted">${item.sets} 组 × ${item.reps} ${unit}${weightStr}</div>
                         </div>
                         ${done ? '<span class="tag">✅ 已完成</span>' : (isToday ? '<span class="tag">待完成</span>' : '')}
                     </div>
@@ -368,11 +369,20 @@ async function editDayPlan(weekday, weeklyPlan, onUpdate) {
                 </div>
                 <div class="card-title"><span>训练项目</span></div>
                 <div id="ep-items" class="list mb-3"></div>
-                <form id="ep-add-form" class="flex gap-2 mb-3">
-                    <input class="input" id="ep-name" placeholder="项目名，如 深蹲" required>
-                    <input class="input" id="ep-sets" type="number" placeholder="组" value="3" style="width:60px">
-                    <input class="input" id="ep-reps" type="number" placeholder="次" value="10" style="width:60px">
-                    <button class="btn" type="submit">添加</button>
+                <form id="ep-add-form" class="mb-3">
+                    <div class="flex gap-2 mb-2">
+                        <input class="input" id="ep-name" placeholder="项目名，如 深蹲" required>
+                    </div>
+                    <div class="flex gap-2">
+                        <input class="input" id="ep-sets" type="number" placeholder="组" value="3" style="width:60px">
+                        <input class="input" id="ep-reps" type="number" placeholder="数量" value="10" style="width:70px">
+                        <select class="select" id="ep-unit" style="width:80px">
+                            <option value="次">次</option>
+                            <option value="分钟">分钟</option>
+                        </select>
+                        <input class="input" id="ep-weight" type="number" step="0.5" placeholder="kg" style="width:70px" title="重量（可选）">
+                        <button class="btn" type="submit">添加</button>
+                    </div>
                 </form>
                 <button class="btn w-full" id="ep-save">保存</button>
             </div>
@@ -386,12 +396,16 @@ async function editDayPlan(weekday, weeklyPlan, onUpdate) {
         const el = overlay.querySelector('#ep-items');
         el.innerHTML = items.length === 0
             ? '<div class="empty text-sm">暂无项目</div>'
-            : items.map((it, i) => `
-                <div class="list-item">
-                    <span style="flex:1">${escapeHtml(it.name)} · ${it.sets} 组 × ${it.reps} ${it.unit || '次'}</span>
-                    <button class="btn btn-sm btn-ghost" data-item-del="${i}">删除</button>
-                </div>
-            `).join('');
+            : items.map((it, i) => {
+                const unit = it.unit || '次';
+                const weightStr = it.weight ? ` · ${it.weight} kg` : '';
+                return `
+                    <div class="list-item">
+                        <span style="flex:1">${escapeHtml(it.name)} · ${it.sets} 组 × ${it.reps} ${unit}${weightStr}</span>
+                        <button class="btn btn-sm btn-ghost" data-item-del="${i}">删除</button>
+                    </div>
+                `;
+            }).join('');
         el.querySelectorAll('[data-item-del]').forEach(btn => {
             btn.addEventListener('click', () => {
                 items.splice(parseInt(btn.dataset.itemDel), 1);
@@ -406,9 +420,15 @@ async function editDayPlan(weekday, weeklyPlan, onUpdate) {
         const name = overlay.querySelector('#ep-name').value.trim();
         const sets = parseInt(overlay.querySelector('#ep-sets').value) || 3;
         const reps = parseInt(overlay.querySelector('#ep-reps').value) || 10;
+        const unit = overlay.querySelector('#ep-unit').value;
+        const weightRaw = overlay.querySelector('#ep-weight').value;
+        const weight = weightRaw ? parseFloat(weightRaw) : null;
         if (!name) return;
-        items.push({ name, sets, reps });
+        const item = { name, sets, reps, unit };
+        if (weight) item.weight = weight;
+        items.push(item);
         overlay.querySelector('#ep-name').value = '';
+        overlay.querySelector('#ep-weight').value = '';
         renderItems();
     });
 

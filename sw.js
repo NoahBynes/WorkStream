@@ -1,5 +1,5 @@
 // Service Worker - 离线缓存（网络优先策略，避免代码更新后仍返回旧版本）
-const CACHE_NAME = 'workstream-v31';
+const CACHE_NAME = 'workstream-v32';
 const CACHE_ASSETS = [
     './',
     './index.html',
@@ -27,6 +27,11 @@ self.addEventListener('install', (event) => {
             .then(cache => cache.addAll(CACHE_ASSETS).catch(() => {}))
             .then(() => self.skipWaiting())
     );
+});
+
+// 接收到 SKIP_WAITING 消息后立即激活
+self.addEventListener('message', (event) => {
+    if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

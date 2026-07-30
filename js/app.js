@@ -164,7 +164,13 @@ function bindGlobalEvents() {
 // 注册 Service Worker
 function registerSW() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(err => {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+            // 每次加载立即检查 SW 更新
+            reg.update();
+            // 检测到新 SW 后立即激活
+            if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+            navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+        }).catch(err => {
             console.warn('SW 注册失败（不影响使用）:', err);
         });
     }
