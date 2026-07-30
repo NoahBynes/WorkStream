@@ -120,7 +120,7 @@ function render(container, tasks, routines, stats) {
 
                 <form id="task-form" class="mb-3">
                     <div class="flex gap-2">
-                        <input class="input" id="task-input" placeholder="添加学习任务，回车确认..." required>
+                        <input class="input" id="task-input" placeholder="添加任务，回车确认..." required>
                         <select class="select" id="task-priority" style="width:90px">
                             <option value="low">🟢 低</option>
                             <option value="medium" selected>🟡 中</option>
