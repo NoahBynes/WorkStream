@@ -1,6 +1,6 @@
 // 仪表盘 - 聚合四模块核心数据
-import { dbGetAll, dbGetByIndex } from '../db.js';
-import { date, formatMoney, escapeHtml } from '../store.js';
+import { dbGetAll, dbGetByIndex, dbPut, dbAdd, genId } from '../db.js';
+import { date, formatMoney, escapeHtml, toast } from '../store.js';
 import { openQuickRecord, openQuickRecordType } from '../components/quick-record.js';
 
 export default async function renderDashboard(container) {
@@ -93,15 +93,30 @@ export default async function renderDashboard(container) {
                     <span>📋 今日待办</span>
                     <button class="btn btn-sm btn-ghost" data-goto="study">前往学习</button>
                 </div>
-                ${todayTasks.length === 0
+                ${(enabledRoutines.length === 0 && todayTasks.length === 0 && doneToday === 0)
                     ? `<div class="empty"><div class="empty-icon">✅</div><div>今天没有待办任务，继续保持！</div></div>`
-                    : `<div class="list">${todayTasks.slice(0, 5).map(t => `
-                        <div class="list-item">
-                            <span>${t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '🟢'}</span>
-                            <span style="flex:1">${escapeHtml(t.title)}</span>
-                            <span class="text-muted text-sm">${escapeHtml(t.subject || '')}</span>
-                        </div>`).join('')}</div>
-                    `}
+                    : `<div class="list">
+                        ${enabledRoutines.map(r => {
+                            const task = tasks.find(t => t.routineId === r.id && t.date === today);
+                            const done = task && task.done;
+                            return `
+                                <div class="list-item">
+                                    <input type="checkbox" class="checkbox" data-routine="${r.id}" ${done ? 'checked' : ''}>
+                                    <span style="flex:1">${escapeHtml(r.icon || '📌')} ${escapeHtml(r.title)}</span>
+                                    ${done ? '<span class="tag">✅</span>' : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                        ${tasks.filter(t => t.date === today && !t.routineId).slice(0, 8).map(t => `
+                            <div class="list-item">
+                                <input type="checkbox" class="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''}>
+                                <span>${t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '🟢'}</span>
+                                <span style="flex:1;${t.done ? 'text-decoration:line-through;opacity:0.6' : ''}">${escapeHtml(t.title)}</span>
+                                ${t.done ? '<span class="tag">✅</span>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>`
+                }
             </div>
 
             <div class="card">
@@ -147,6 +162,39 @@ export default async function renderDashboard(container) {
         });
     });
 
+    // 今日待办打卡（固定任务 + 额外任务）
+    container.querySelectorAll('[data-routine]').forEach(check => {
+        check.addEventListener('change', async () => {
+            const routineId = check.dataset.routine;
+            const existing = tasks.find(t => t.routineId === routineId && t.date === today);
+            if (existing) {
+                existing.done = check.checked;
+                existing.completedAt = check.checked ? date.now() : null;
+                await dbPut('study_tasks', existing);
+            } else {
+                const r = enabledRoutines.find(x => x.id === routineId);
+                await dbAdd('study_tasks', {
+                    id: genId(), title: r.title, subject: r.subject,
+                    priority: 'medium', done: check.checked, date: today,
+                    routineId, completedAt: check.checked ? date.now() : null, createdAt: date.now()
+                });
+            }
+            toast(check.checked ? '打卡成功 🎉' : '已取消');
+            refresh();
+        });
+    });
+    container.querySelectorAll('[data-task]').forEach(check => {
+        check.addEventListener('change', async () => {
+            const t = tasks.find(x => x.id === check.dataset.task);
+            if (!t) return;
+            t.done = check.checked;
+            t.completedAt = check.checked ? date.now() : null;
+            await dbPut('study_tasks', t);
+            toast(check.checked ? '完成 🎉' : '已取消');
+            refresh();
+        });
+    });
+
     // 快捷记录按钮（仪表盘快捷条直接对应类型打开表单）
     container.querySelectorAll('[data-qr]').forEach(btn => {
         btn.addEventListener('click', () => openQuickRecordType(btn.dataset.qr));
@@ -155,6 +203,11 @@ export default async function renderDashboard(container) {
     // 渲染图表
     renderExpenseChart(recentExpenses);
     renderWeightChart(weights.slice(0, 14).reverse());
+}
+
+async function refresh() {
+    const container = document.getElementById('page-container');
+    if (container) await renderDashboard(container);
 }
 
 function renderExpenseChart(expenses) {
