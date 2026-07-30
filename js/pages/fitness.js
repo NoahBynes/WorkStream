@@ -402,6 +402,7 @@ async function editDayPlan(weekday, weeklyPlan, onUpdate) {
                 return `
                     <div class="list-item">
                         <span style="flex:1">${escapeHtml(it.name)} · ${it.sets} 组 × ${it.reps} ${unit}${weightStr}</span>
+                        <button class="btn btn-sm btn-ghost" data-item-edit="${i}">编辑</button>
                         <button class="btn btn-sm btn-ghost" data-item-del="${i}">删除</button>
                     </div>
                 `;
@@ -412,8 +413,80 @@ async function editDayPlan(weekday, weeklyPlan, onUpdate) {
                 renderItems();
             });
         });
+        el.querySelectorAll('[data-item-edit]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.itemEdit);
+                openItemEditor(items[idx], (updated) => {
+                    if (updated) {
+                        items[idx] = updated;
+                        renderItems();
+                    }
+                });
+            });
+        });
     };
     renderItems();
+
+    // 编辑单个训练项的弹窗
+    function openItemEditor(item, onSaved) {
+        const editorOverlay = document.createElement('div');
+        editorOverlay.className = 'qr-overlay';
+        editorOverlay.innerHTML = `
+            <div class="qr-modal" style="max-width:400px">
+                <div class="qr-header">
+                    <span class="qr-title">编辑训练项</span>
+                    <button class="btn btn-sm btn-ghost" id="ie-close">✕</button>
+                </div>
+                <div style="padding:16px">
+                    <div class="field">
+                        <label class="field-label">项目名称</label>
+                        <input class="input" id="ie-name" value="${escapeHtml(item.name)}">
+                    </div>
+                    <div class="flex gap-2" style="flex-wrap:wrap">
+                        <div class="field" style="width:80px;flex:0 0 auto">
+                            <label class="field-label">组数</label>
+                            <input class="input" id="ie-sets" type="number" value="${item.sets}">
+                        </div>
+                        <div class="field" style="width:90px;flex:0 0 auto">
+                            <label class="field-label">数量</label>
+                            <input class="input" id="ie-reps" type="number" value="${item.reps}">
+                        </div>
+                        <div class="field" style="width:90px;flex:0 0 auto">
+                            <label class="field-label">单位</label>
+                            <select class="select" id="ie-unit">
+                                <option value="次" ${item.unit === '次' || !item.unit ? 'selected' : ''}>次</option>
+                                <option value="分钟" ${item.unit === '分钟' ? 'selected' : ''}>分钟</option>
+                            </select>
+                        </div>
+                        <div class="field" style="width:90px;flex:0 0 auto">
+                            <label class="field-label">重量(kg)</label>
+                            <input class="input" id="ie-weight" type="number" step="0.5" value="${item.weight || ''}" placeholder="可选">
+                        </div>
+                    </div>
+                    <button class="btn w-full" id="ie-save">保存</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(editorOverlay);
+
+        const close = () => editorOverlay.remove();
+        editorOverlay.querySelector('#ie-close').addEventListener('click', close);
+        editorOverlay.addEventListener('click', (e) => { if (e.target === editorOverlay) close(); });
+
+        editorOverlay.querySelector('#ie-save').addEventListener('click', () => {
+            const name = editorOverlay.querySelector('#ie-name').value.trim();
+            if (!name) { toast('请输入项目名称', 'error'); return; }
+            const sets = parseInt(editorOverlay.querySelector('#ie-sets').value) || 1;
+            const reps = parseInt(editorOverlay.querySelector('#ie-reps').value) || 1;
+            const unit = editorOverlay.querySelector('#ie-unit').value;
+            const weightRaw = editorOverlay.querySelector('#ie-weight').value;
+            const weight = weightRaw ? parseFloat(weightRaw) : null;
+            const updated = { name, sets, reps, unit };
+            if (weight) updated.weight = weight;
+            close();
+            onSaved(updated);
+        });
+    }
 
     overlay.querySelector('#ep-add-form').addEventListener('submit', (e) => {
         e.preventDefault();
