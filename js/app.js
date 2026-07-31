@@ -172,8 +172,18 @@ function registerSW() {
         navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
             // 每次加载立即检查 SW 更新
             reg.update();
-            // 检测到新 SW 后立即激活
+            // 已有等待中的新 SW：立即激活
             if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+            // 新 SW 正在安装：安装完成后立即激活
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        newWorker.postMessage('SKIP_WAITING');
+                    }
+                });
+            });
             navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
         }).catch(err => {
             console.warn('SW 注册失败（不影响使用）:', err);

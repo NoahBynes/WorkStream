@@ -1,5 +1,5 @@
 // Service Worker - 离线缓存（网络优先策略，避免代码更新后仍返回旧版本）
-const CACHE_NAME = 'workstream-v42';
+const CACHE_NAME = 'workstream-v43';
 const CACHE_ASSETS = [
     './',
     './index.html',
