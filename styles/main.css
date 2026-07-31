@@ -532,3 +532,32 @@ html, body {
 .workout-task.done { opacity: 0.55; }
 .workout-task.done .wt-name { text-decoration: line-through; }
 
+/* ============ 时间轴 ============ */
+.timeline { display: flex; flex-direction: column; gap: 18px; }
+.timeline-day { position: relative; padding-left: 0; }
+.timeline-day-label {
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+    margin-bottom: 10px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+.timeline-events { display: flex; flex-direction: column; gap: 10px; position: relative; }
+.timeline-events::before {
+    content: ''; position: absolute; left: 15px; top: 4px; bottom: 4px;
+    width: 2px; background: var(--border);
+}
+.timeline-item {
+    display: flex; align-items: flex-start; gap: 12px; position: relative;
+}
+.timeline-dot {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0; z-index: 1;
+    box-shadow: 0 0 0 3px var(--surface);
+}
+.timeline-content { flex: 1; min-width: 0; padding-top: 4px; }
+.timeline-title { font-size: 13px; font-weight: 500; }
+.timeline-detail {
+    font-size: 12px; color: var(--text-muted); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+

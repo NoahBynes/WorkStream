@@ -196,6 +196,14 @@ export default async function renderDashboard(container) {
                 }
             </div>
         </div>
+
+        <div class="card mt-4">
+            <div class="card-title">
+                <span>🕐 时间轴</span>
+                <span class="text-muted text-sm">近期活动</span>
+            </div>
+            <div id="timeline-list"></div>
+        </div>
     `;
 
     // 跳转按钮
@@ -246,6 +254,7 @@ export default async function renderDashboard(container) {
     // 渲染图表
     renderExpenseChart(recentExpenses);
     renderWeightChart(weights.slice(0, 14).reverse());
+    renderTimeline({ tasks, fitness, financeAll, newsFav });
 }
 
 async function refresh() {
@@ -318,4 +327,96 @@ function renderWeightChart(weights) {
             }
         }
     });
+}
+
+// ============ 时间轴：聚合所有模块近期活动 ============
+function renderTimeline({ tasks, fitness, financeAll, newsFav }) {
+    const el = document.getElementById('timeline-list');
+    if (!el) return;
+
+    const events = [];
+
+    // 学习任务完成
+    tasks.filter(t => t.done && t.completedAt).forEach(t => {
+        events.push({
+            time: t.completedAt || t.date,
+            sortKey: (t.completedAt || t.date + ' 00:00:00'),
+            icon: '📚', color: 'var(--primary)',
+            title: `完成学习任务：${t.title}`,
+            detail: t.subject ? escapeHtml(t.subject) : ''
+        });
+    });
+
+    // 体重记录
+    fitness.filter(f => f.type === 'weight').forEach(w => {
+        events.push({
+            time: w.date, sortKey: (w.createdAt || w.date + ' 00:00:00'),
+            icon: '⚖️', color: 'var(--fitness)',
+            title: `记录体重：${w.value} kg`,
+            detail: w.note ? escapeHtml(w.note) : ''
+        });
+    });
+
+    // 收支记录
+    financeAll.forEach(r => {
+        events.push({
+            time: r.date, sortKey: (r.createdAt || r.date + ' 00:00:00'),
+            icon: r.type === 'income' ? '📈' : '📉',
+            color: r.type === 'income' ? 'var(--success)' : 'var(--danger)',
+            title: `${r.type === 'income' ? '收入' : '支出'}：${formatMoney(r.amount)}`,
+            detail: escapeHtml(r.category + (r.note ? ` · ${r.note}` : ''))
+        });
+    });
+
+    // 新闻收藏
+    newsFav.forEach(n => {
+        events.push({
+            time: (n.savedAt || '').slice(0, 10), sortKey: (n.savedAt || ''),
+            icon: '🔥', color: 'var(--warning)',
+            title: '收藏热点',
+            detail: escapeHtml(n.title || '')
+        });
+    });
+
+    // 按时间倒序，取最近 20 条
+    events.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    const recent = events.slice(0, 20);
+
+    if (recent.length === 0) {
+        el.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><div>暂无活动记录</div></div>';
+        return;
+    }
+
+    // 按日期分组
+    const groups = {};
+    recent.forEach(e => {
+        const day = (e.time || '').slice(0, 10);
+        if (!groups[day]) groups[day] = [];
+        groups[day].push(e);
+    });
+
+    const todayStr = date.today();
+    const yesterdayStr = date.daysAgo(1);
+    const dayLabel = (d) => {
+        if (d === todayStr) return '今天';
+        if (d === yesterdayStr) return '昨天';
+        return date.format(d);
+    };
+
+    el.innerHTML = `<div class="timeline">${Object.entries(groups).map(([day, evts]) => `
+        <div class="timeline-day">
+            <div class="timeline-day-label">${dayLabel(day)}</div>
+            <div class="timeline-events">
+                ${evts.map(e => `
+                    <div class="timeline-item">
+                        <div class="timeline-dot" style="background:${e.color}">${e.icon}</div>
+                        <div class="timeline-content">
+                            <div class="timeline-title">${escapeHtml(e.title)}</div>
+                            ${e.detail ? `<div class="timeline-detail">${e.detail}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('')}</div>`;
 }
