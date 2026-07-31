@@ -24,23 +24,11 @@ export default async function renderDashboard(container) {
     // 学习：今日待办（额外任务 + 固定任务合并计数）
     const todayTasks = tasks.filter(t => !t.done && t.date === today && !t.routineId);
     const doneToday = tasks.filter(t => t.done && t.date === today && !t.routineId).length;
-    // 固定任务：启用的 routines 中今日已打卡的数量
+    // 固定任务：启用的 routines
     const enabledRoutines = routines.filter(r => r.enabled);
-    const routineDoneCount = enabledRoutines.filter(r =>
-        tasks.some(t => t.routineId === r.id && t.date === today && t.done)
-    ).length;
-    const totalToday = todayTasks.length + doneToday + enabledRoutines.length;
-    const totalDoneToday = doneToday + routineDoneCount;
 
-    // 身材：最新体重
+    // 身材：体重数据（用于图表）
     const weights = fitness.filter(f => f.type === 'weight').sort((a, b) => b.date.localeCompare(a.date));
-    const latestWeight = weights[0];
-    const prevWeight = weights[1];
-
-    // 财务：本月结余
-    const monthIncome = financeAll.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const monthExpense = financeAll.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const balance = monthIncome - monthExpense;
 
     // 近 7 天支出
     const sevenDaysAgo = date.daysAgo(7);
@@ -91,33 +79,35 @@ export default async function renderDashboard(container) {
             <button class="quick-bar-item" data-qr="income"><span class="qb-icon">📈</span><span class="qb-label">记收入</span></button>
         </div>
 
-        <div class="grid grid-4 mb-4">
-            <div class="stat-card">
-                <div class="stat-label">今日待办</div>
-                <div class="stat-icon">📚</div>
-                <div class="stat-value">${totalDoneToday}<span class="text-lg text-muted">/${totalToday}</span></div>
-                <div class="stat-trend">已完成 ${totalDoneToday} / ${totalToday}</div>
+        <div class="card mb-4">
+            <div class="card-title">
+                <span>📋 今日待办</span>
+                <button class="btn btn-sm btn-ghost" data-goto="study">前往学习</button>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">最新体重</div>
-                <div class="stat-icon">💪</div>
-                <div class="stat-value">${latestWeight ? latestWeight.value : '--'}</div>
-                <div class="stat-trend ${prevWeight ? (latestWeight.value < prevWeight.value ? 'up' : 'down') : ''}">
-                    ${prevWeight ? `${latestWeight.value - prevWeight.value > 0 ? '+' : ''}${(latestWeight.value - prevWeight.value).toFixed(1)} kg` : '暂无记录'}
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">本月结余</div>
-                <div class="stat-icon">💰</div>
-                <div class="stat-value ${balance >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(balance)}</div>
-                <div class="stat-trend">收入 ${formatMoney(monthIncome)} · 支出 ${formatMoney(monthExpense)}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">收藏热点</div>
-                <div class="stat-icon">🔥</div>
-                <div class="stat-value">${newsFav.length}</div>
-                <div class="stat-trend">已收藏条目</div>
-            </div>
+            ${(enabledRoutines.length === 0 && todayTasks.length === 0 && doneToday === 0)
+                ? `<div class="empty"><div class="empty-icon">✅</div><div>今天没有待办任务，继续保持！</div></div>`
+                : `<div class="list">
+                    ${enabledRoutines.map(r => {
+                        const task = tasks.find(t => t.routineId === r.id && t.date === today);
+                        const done = task && task.done;
+                        return `
+                            <div class="list-item">
+                                <input type="checkbox" class="checkbox" data-routine="${r.id}" ${done ? 'checked' : ''}>
+                                <span style="flex:1">${escapeHtml(r.icon || '📌')} ${escapeHtml(r.title)}</span>
+                                ${done ? '<span class="tag">✅</span>' : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                    ${tasks.filter(t => t.date === today && !t.routineId).slice(0, 8).map(t => `
+                        <div class="list-item">
+                            <input type="checkbox" class="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''}>
+                            <span>${t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '🟢'}</span>
+                            <span style="flex:1;${t.done ? 'text-decoration:line-through;opacity:0.6' : ''}">${escapeHtml(t.title)}</span>
+                            ${t.done ? '<span class="tag">✅</span>' : ''}
+                        </div>
+                    `).join('')}
+                </div>`
+            }
         </div>
 
         <div class="card mb-4">
@@ -150,45 +140,12 @@ export default async function renderDashboard(container) {
         <div class="grid grid-2">
             <div class="card">
                 <div class="card-title">
-                    <span>📋 今日待办</span>
-                    <button class="btn btn-sm btn-ghost" data-goto="study">前往学习</button>
-                </div>
-                ${(enabledRoutines.length === 0 && todayTasks.length === 0 && doneToday === 0)
-                    ? `<div class="empty"><div class="empty-icon">✅</div><div>今天没有待办任务，继续保持！</div></div>`
-                    : `<div class="list">
-                        ${enabledRoutines.map(r => {
-                            const task = tasks.find(t => t.routineId === r.id && t.date === today);
-                            const done = task && task.done;
-                            return `
-                                <div class="list-item">
-                                    <input type="checkbox" class="checkbox" data-routine="${r.id}" ${done ? 'checked' : ''}>
-                                    <span style="flex:1">${escapeHtml(r.icon || '📌')} ${escapeHtml(r.title)}</span>
-                                    ${done ? '<span class="tag">✅</span>' : ''}
-                                </div>
-                            `;
-                        }).join('')}
-                        ${tasks.filter(t => t.date === today && !t.routineId).slice(0, 8).map(t => `
-                            <div class="list-item">
-                                <input type="checkbox" class="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''}>
-                                <span>${t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '🟢'}</span>
-                                <span style="flex:1;${t.done ? 'text-decoration:line-through;opacity:0.6' : ''}">${escapeHtml(t.title)}</span>
-                                ${t.done ? '<span class="tag">✅</span>' : ''}
-                            </div>
-                        `).join('')}
-                    </div>`
-                }
-            </div>
-
-            <div class="card">
-                <div class="card-title">
                     <span>📊 近 7 天支出</span>
                     <button class="btn btn-sm btn-ghost" data-goto="finance">查看明细</button>
                 </div>
                 <div style="height:200px"><canvas id="dashExpenseChart"></canvas></div>
             </div>
-        </div>
 
-        <div class="grid grid-2 mt-4">
             <div class="card">
                 <div class="card-title">
                     <span>💪 体重趋势</span>
@@ -196,22 +153,22 @@ export default async function renderDashboard(container) {
                 </div>
                 <div style="height:200px"><canvas id="dashWeightChart"></canvas></div>
             </div>
+        </div>
 
-            <div class="card">
-                <div class="card-title">
-                    <span>🔥 收藏热点</span>
-                    <button class="btn btn-sm btn-ghost" data-goto="news">查看更多</button>
-                </div>
-                ${newsFav.length === 0
-                    ? `<div class="empty"><div class="empty-icon">📰</div><div>还没有收藏的热点</div></div>`
-                    : `<div class="list">${newsFav.slice(-5).reverse().map(n => `
-                        <div class="list-item">
-                            <span>🔥</span>
-                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(n.title)}</span>
-                            <a href="${escapeHtml(n.link)}" target="_blank" class="btn btn-sm btn-ghost">打开</a>
-                        </div>`).join('')}</div>`
-                }
+        <div class="card mt-4">
+            <div class="card-title">
+                <span>🔥 收藏热点</span>
+                <button class="btn btn-sm btn-ghost" data-goto="news">查看更多</button>
             </div>
+            ${newsFav.length === 0
+                ? `<div class="empty"><div class="empty-icon">📰</div><div>还没有收藏的热点</div></div>`
+                : `<div class="list">${newsFav.slice(-5).reverse().map(n => `
+                    <div class="list-item">
+                        <span>🔥</span>
+                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(n.title)}</span>
+                        <a href="${escapeHtml(n.link)}" target="_blank" class="btn btn-sm btn-ghost">打开</a>
+                    </div>`).join('')}</div>`
+            }
         </div>
     `;
 
