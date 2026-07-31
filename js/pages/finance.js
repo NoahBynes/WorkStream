@@ -9,10 +9,24 @@ const CATEGORIES = {
 
 let currentType = 'expense';
 
+// 账单浏览状态：月账单 / 年账单，支持历史浏览
+let viewMode = 'month'; // 'month' | 'year'
+const now = new Date();
+let viewYear = now.getFullYear();
+let viewMonth = now.getMonth() + 1; // 1-12
+
+function periodRange() {
+    const pad = n => String(n).padStart(2, '0');
+    if (viewMode === 'year') {
+        return { start: `${viewYear}-01-01`, end: `${viewYear}-12-31`, label: `${viewYear} 年` };
+    }
+    const lastDay = new Date(viewYear, viewMonth, 0).getDate();
+    return { start: `${viewYear}-${pad(viewMonth)}-01`, end: `${viewYear}-${pad(viewMonth)}-${pad(lastDay)}`, label: `${viewYear}-${pad(viewMonth)}` };
+}
+
 export default async function renderFinance(container) {
-    const monthStart = date.monthStart();
-    const monthEnd = date.monthEnd();
-    const records = await dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(monthStart, monthEnd + '\uffff'));
+    const range = periodRange();
+    const records = await dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(range.start, range.end + '\uffff'));
     const allRecords = await dbGetAll('finance_records');
     const budget = store.get('finance_budget', { monthly: 0 });
 
@@ -26,11 +40,19 @@ export default async function renderFinance(container) {
     const totalExpense = allRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
     const totalAssets = totalIncome - totalExpense;
 
+    const isMonthView = viewMode === 'month';
+    const isCurrentPeriod = isMonthView
+        ? (viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1)
+        : (viewYear === now.getFullYear());
+    // 年账单的月均支出（当前年份按已过月数计算，否则按 12 个月）
+    const monthsElapsed = isCurrentPeriod ? now.getMonth() + 1 : 12;
+    const monthAvgExpense = monthsElapsed > 0 ? expense / monthsElapsed : 0;
+
     container.innerHTML = `
         <div class="page-header">
             <div>
                 <div class="page-title">💰 财务规划</div>
-                <div class="page-subtitle">${date.format(monthStart).slice(0, 7)} · 收支记账 · 总资产 · 预算</div>
+                <div class="page-subtitle">${range.label} · 收支记账 · 总资产 · 预算</div>
             </div>
             <button class="btn btn-secondary" id="btn-budget">⚙️ 预算设置</button>
         </div>
@@ -48,28 +70,48 @@ export default async function renderFinance(container) {
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="flex-between" style="flex-wrap:wrap;gap:10px">
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-sm ${isMonthView ? '' : 'btn-secondary'}" data-view="month">📅 月账单</button>
+                    <button type="button" class="btn btn-sm ${isMonthView ? 'btn-secondary' : ''}" data-view="year">📈 年账单</button>
+                </div>
+                <div class="flex gap-2" style="align-items:center">
+                    <button type="button" class="btn btn-sm btn-ghost" id="period-prev">‹</button>
+                    <span style="min-width:90px;text-align:center;font-weight:600">${range.label}</span>
+                    <button type="button" class="btn btn-sm btn-ghost" id="period-next">›</button>
+                    ${isCurrentPeriod ? '' : '<button type="button" class="btn btn-sm btn-ghost" id="period-today">本期</button>'}
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-4 mb-4">
             <div class="stat-card">
-                <div class="stat-label">本月收入</div>
+                <div class="stat-label">${isMonthView ? '本月收入' : '年度收入'}</div>
                 <div class="stat-icon">📈</div>
                 <div class="stat-value text-success">${formatMoney(income)}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">本月支出</div>
+                <div class="stat-label">${isMonthView ? '本月支出' : '年度支出'}</div>
                 <div class="stat-icon">📉</div>
                 <div class="stat-value text-danger">${formatMoney(expense)}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">本月结余</div>
+                <div class="stat-label">${isMonthView ? '本月结余' : '年度结余'}</div>
                 <div class="stat-icon">💰</div>
                 <div class="stat-value ${balance >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(balance)}</div>
             </div>
-            <div class="stat-card">
+            ${isMonthView ? `<div class="stat-card">
                 <div class="stat-label">预算使用</div>
                 <div class="stat-icon">🎯</div>
                 <div class="stat-value ${budgetUsed > 100 ? 'text-danger' : ''}">${budget.monthly > 0 ? budgetUsed.toFixed(0) + '%' : '未设'}</div>
                 <div class="progress mt-2"><div class="progress-bar" style="width:${Math.min(budgetUsed, 100)}%;background:${budgetUsed > 100 ? 'var(--danger)' : 'var(--primary)'}"></div></div>
-            </div>
+            </div>` : `<div class="stat-card">
+                <div class="stat-label">月均支出</div>
+                <div class="stat-icon">📊</div>
+                <div class="stat-value text-danger">${formatMoney(monthAvgExpense)}</div>
+                <div class="stat-trend">按 ${monthsElapsed} 个月计算</div>
+            </div>`}
         </div>
 
         <div class="grid grid-2">
@@ -110,8 +152,8 @@ export default async function renderFinance(container) {
 
         <div class="card mt-4">
             <div class="card-title">
-                <span>📋 本月明细</span>
-                <span class="text-muted text-sm">共 ${records.length} 条</span>
+                <span>📋 ${isMonthView ? '月度明细' : '年度明细'}</span>
+                <span class="text-muted text-sm">${range.label} · 共 ${records.length} 条</span>
             </div>
             <div style="overflow-x:auto">
                 <table class="table">
@@ -192,6 +234,35 @@ function renderRecordTable(records) {
 function bindEvents() {
     document.getElementById('type-expense').addEventListener('click', () => switchType('expense'));
     document.getElementById('type-income').addEventListener('click', () => switchType('income'));
+
+    // 账单浏览：月/年切换 + 历史翻页
+    document.querySelectorAll('[data-view]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            viewMode = btn.dataset.view;
+            // 切换模式时回到当前周期
+            viewYear = now.getFullYear();
+            viewMonth = now.getMonth() + 1;
+            refresh();
+        });
+    });
+    const prevBtn = document.getElementById('period-prev');
+    const nextBtn = document.getElementById('period-next');
+    const todayBtn = document.getElementById('period-today');
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (viewMode === 'year') { viewYear -= 1; }
+        else { viewMonth -= 1; if (viewMonth < 1) { viewMonth = 12; viewYear -= 1; } }
+        refresh();
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (viewMode === 'year') { viewYear += 1; }
+        else { viewMonth += 1; if (viewMonth > 12) { viewMonth = 1; viewYear += 1; } }
+        refresh();
+    });
+    if (todayBtn) todayBtn.addEventListener('click', () => {
+        viewYear = now.getFullYear();
+        viewMonth = now.getMonth() + 1;
+        refresh();
+    });
 
     document.getElementById('finance-form').addEventListener('submit', async (e) => {
         e.preventDefault();

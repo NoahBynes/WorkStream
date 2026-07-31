@@ -10,13 +10,15 @@ export default async function renderDashboard(container) {
     const weekStart = date.weekStart();  // 本周一
 
     // 并行加载各模块数据（financeAll 加载本月+上周数据以支持周总结跨月）
-    const [tasks, routines, fitness, financeAll, financeWeek, newsFav] = await Promise.all([
+    const [tasks, routines, fitness, financeAll, financeWeek, newsFav, weeklyPlan, workoutTasks] = await Promise.all([
         dbGetAll('study_tasks'),
         dbGetAll('study_routines'),
         dbGetAll('fitness_records'),
         dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(monthStart, monthEnd + '\uffff')),
         dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(weekStart, today + '\uffff')),
-        dbGetAll('news_favorites')
+        dbGetAll('news_favorites'),
+        dbGetAll('fitness_weekly_plan'),
+        dbGetAll('fitness_workout_tasks')
     ]);
 
     // 学习：今日待办（额外任务 + 固定任务合并计数）
@@ -52,10 +54,25 @@ export default async function renderDashboard(container) {
     const weekWeightChange = weekWeights.length >= 2
         ? (weekWeights[weekWeights.length - 1].value - weekWeights[0].value)
         : null;
-    const weekIncome = financeWeek.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
     const weekExpense = financeWeek.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const weekBalance = weekIncome - weekExpense;
-    const weekNewsFav = newsFav.filter(n => (n.savedAt || '').slice(0, 10) >= weekStart && (n.savedAt || '').slice(0, 10) <= today);
+
+    // 本周训练计划完成：统计 weekStart~today 各天计划项总数与已完成数
+    const weekDates = [];
+    {
+        const pad = n => String(n).padStart(2, '0');
+        const sd = new Date(weekStart + 'T00:00:00');
+        const ed = new Date(today + 'T00:00:00');
+        for (let d = new Date(sd); d <= ed; d.setDate(d.getDate() + 1)) {
+            weekDates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+        }
+    }
+    let weekPlanTotal = 0;
+    weekDates.forEach(ds => {
+        const wd = new Date(ds + 'T00:00:00').getDay();
+        const plan = weeklyPlan.find(p => p.weekday === wd);
+        if (plan && plan.items) weekPlanTotal += plan.items.length;
+    });
+    const weekPlanDone = workoutTasks.filter(t => t.date >= weekStart && t.date <= today && t.done).length;
     // 本周第几天（1=周一...7=周日）
     const weekDayNum = new Date().getDay() === 0 ? 7 : new Date().getDay();
 
@@ -114,18 +131,18 @@ export default async function renderDashboard(container) {
                     <div class="stat-value" style="font-size:22px">${weekTaskDone}<span class="text-lg text-muted">/${weekTasks.length}</span></div>
                 </div>
                 <div class="stat-card" style="padding:14px">
+                    <div class="stat-label">💪 训练完成</div>
+                    <div class="stat-value ${weekPlanTotal === 0 ? '' : (weekPlanDone >= weekPlanTotal ? 'text-success' : '')}" style="font-size:22px">${weekPlanDone}<span class="text-lg text-muted">/${weekPlanTotal}</span></div>
+                </div>
+                <div class="stat-card" style="padding:14px">
+                    <div class="stat-label">💰 周支出</div>
+                    <div class="stat-value text-danger" style="font-size:22px">${formatMoney(weekExpense)}</div>
+                </div>
+                <div class="stat-card" style="padding:14px">
                     <div class="stat-label">⚖️ 体重变化</div>
                     <div class="stat-value ${weekWeightChange === null ? '' : (weekWeightChange < 0 ? 'text-success' : 'text-danger')}" style="font-size:22px">
                         ${weekWeightChange === null ? '--' : `${weekWeightChange > 0 ? '+' : ''}${weekWeightChange.toFixed(1)} kg`}
                     </div>
-                </div>
-                <div class="stat-card" style="padding:14px">
-                    <div class="stat-label">💰 本周结余</div>
-                    <div class="stat-value ${weekBalance >= 0 ? 'text-success' : 'text-danger'}" style="font-size:22px">${formatMoney(weekBalance)}</div>
-                </div>
-                <div class="stat-card" style="padding:14px">
-                    <div class="stat-label">🔥 收藏热点</div>
-                    <div class="stat-value" style="font-size:22px">${weekNewsFav.length}</div>
                 </div>
             </div>
         </div>
@@ -196,14 +213,6 @@ export default async function renderDashboard(container) {
                 }
             </div>
         </div>
-
-        <div class="card mt-4">
-            <div class="card-title">
-                <span>🕐 时间轴</span>
-                <span class="text-muted text-sm">近期活动</span>
-            </div>
-            <div id="timeline-list"></div>
-        </div>
     `;
 
     // 跳转按钮
@@ -254,7 +263,6 @@ export default async function renderDashboard(container) {
     // 渲染图表
     renderExpenseChart(recentExpenses);
     renderWeightChart(weights.slice(0, 14).reverse());
-    renderTimeline({ tasks, fitness, financeAll, newsFav });
 }
 
 async function refresh() {
@@ -327,96 +335,4 @@ function renderWeightChart(weights) {
             }
         }
     });
-}
-
-// ============ 时间轴：聚合所有模块近期活动 ============
-function renderTimeline({ tasks, fitness, financeAll, newsFav }) {
-    const el = document.getElementById('timeline-list');
-    if (!el) return;
-
-    const events = [];
-
-    // 学习任务完成
-    tasks.filter(t => t.done && t.completedAt).forEach(t => {
-        events.push({
-            time: t.completedAt || t.date,
-            sortKey: (t.completedAt || t.date + ' 00:00:00'),
-            icon: '📚', color: 'var(--primary)',
-            title: `完成学习任务：${t.title}`,
-            detail: t.subject ? escapeHtml(t.subject) : ''
-        });
-    });
-
-    // 体重记录
-    fitness.filter(f => f.type === 'weight').forEach(w => {
-        events.push({
-            time: w.date, sortKey: (w.createdAt || w.date + ' 00:00:00'),
-            icon: '⚖️', color: 'var(--fitness)',
-            title: `记录体重：${w.value} kg`,
-            detail: w.note ? escapeHtml(w.note) : ''
-        });
-    });
-
-    // 收支记录
-    financeAll.forEach(r => {
-        events.push({
-            time: r.date, sortKey: (r.createdAt || r.date + ' 00:00:00'),
-            icon: r.type === 'income' ? '📈' : '📉',
-            color: r.type === 'income' ? 'var(--success)' : 'var(--danger)',
-            title: `${r.type === 'income' ? '收入' : '支出'}：${formatMoney(r.amount)}`,
-            detail: escapeHtml(r.category + (r.note ? ` · ${r.note}` : ''))
-        });
-    });
-
-    // 新闻收藏
-    newsFav.forEach(n => {
-        events.push({
-            time: (n.savedAt || '').slice(0, 10), sortKey: (n.savedAt || ''),
-            icon: '🔥', color: 'var(--warning)',
-            title: '收藏热点',
-            detail: escapeHtml(n.title || '')
-        });
-    });
-
-    // 按时间倒序，取最近 20 条
-    events.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-    const recent = events.slice(0, 20);
-
-    if (recent.length === 0) {
-        el.innerHTML = '<div class="empty"><div class="empty-icon">🕐</div><div>暂无活动记录</div></div>';
-        return;
-    }
-
-    // 按日期分组
-    const groups = {};
-    recent.forEach(e => {
-        const day = (e.time || '').slice(0, 10);
-        if (!groups[day]) groups[day] = [];
-        groups[day].push(e);
-    });
-
-    const todayStr = date.today();
-    const yesterdayStr = date.daysAgo(1);
-    const dayLabel = (d) => {
-        if (d === todayStr) return '今天';
-        if (d === yesterdayStr) return '昨天';
-        return date.format(d);
-    };
-
-    el.innerHTML = `<div class="timeline">${Object.entries(groups).map(([day, evts]) => `
-        <div class="timeline-day">
-            <div class="timeline-day-label">${dayLabel(day)}</div>
-            <div class="timeline-events">
-                ${evts.map(e => `
-                    <div class="timeline-item">
-                        <div class="timeline-dot" style="background:${e.color}">${e.icon}</div>
-                        <div class="timeline-content">
-                            <div class="timeline-title">${escapeHtml(e.title)}</div>
-                            ${e.detail ? `<div class="timeline-detail">${e.detail}</div>` : ''}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `).join('')}</div>`;
 }
