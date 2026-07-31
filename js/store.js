@@ -86,6 +86,15 @@ const date = {
         const pad = x => String(x).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     },
+    // 本周一（周一为一周开始）
+    weekStart() {
+        const d = new Date();
+        const day = d.getDay();  // 0=周日, 1=周一...
+        const diff = day === 0 ? 6 : day - 1;  // 距周一的天数
+        d.setDate(d.getDate() - diff);
+        const pad = x => String(x).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    },
     // 获取当前时区显示名（如 "Asia/Shanghai (UTC+8)"）
     timezone() {
         try {
@@ -138,10 +147,11 @@ function formDialog({ title, fields, submitText = '确定', cancelText = '取消
                     </div>
                 `;
             }
+            const stepAttr = f.type === 'number' ? ` step="${f.step || 'any'}" inputmode="decimal"` : '';  // number 字段允许小数
             return `
                 <div class="field">
                     ${f.label ? `<label class="field-label">${f.label}</label>` : ''}
-                    <input class="input" id="fd-${f.key}" type="${f.type || 'text'}" placeholder="${f.placeholder || ''}" value="${f.default != null ? f.default : ''}">
+                    <input class="input" id="fd-${f.key}" type="${f.type || 'text'}" placeholder="${f.placeholder || ''}" value="${f.default != null ? f.default : ''}"${stepAttr}>
                 </div>
             `;
         }).join('');

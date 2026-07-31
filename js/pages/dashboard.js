@@ -7,13 +7,15 @@ export default async function renderDashboard(container) {
     const today = date.today();
     const monthStart = date.monthStart();
     const monthEnd = date.monthEnd();
+    const weekStart = date.weekStart();  // 本周一
 
-    // 并行加载各模块数据
-    const [tasks, routines, fitness, financeAll, newsFav] = await Promise.all([
+    // 并行加载各模块数据（financeAll 加载本月+上周数据以支持周总结跨月）
+    const [tasks, routines, fitness, financeAll, financeWeek, newsFav] = await Promise.all([
         dbGetAll('study_tasks'),
         dbGetAll('study_routines'),
         dbGetAll('fitness_records'),
         dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(monthStart, monthEnd + '\uffff')),
+        dbGetByIndex('finance_records', 'date', IDBKeyRange.bound(weekStart, today + '\uffff')),
         dbGetAll('news_favorites')
     ]);
 
@@ -41,6 +43,21 @@ export default async function renderDashboard(container) {
     // 近 7 天支出
     const sevenDaysAgo = date.daysAgo(7);
     const recentExpenses = financeAll.filter(r => r.type === 'expense' && r.date >= sevenDaysAgo);
+
+    // 本周总结数据（周一至今）
+    const weekTasks = tasks.filter(t => t.date >= weekStart && t.date <= today);
+    const weekTaskDone = weekTasks.filter(t => t.done).length;
+    const weekWorkouts = fitness.filter(f => f.type === 'weight' && f.date >= weekStart && f.date <= today);
+    const weekWeights = weekWorkouts.sort((a, b) => a.date.localeCompare(b.date));
+    const weekWeightChange = weekWeights.length >= 2
+        ? (weekWeights[weekWeights.length - 1].value - weekWeights[0].value)
+        : null;
+    const weekIncome = financeWeek.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const weekExpense = financeWeek.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const weekBalance = weekIncome - weekExpense;
+    const weekNewsFav = newsFav.filter(n => (n.savedAt || '').slice(0, 10) >= weekStart && (n.savedAt || '').slice(0, 10) <= today);
+    // 本周第几天（1=周一...7=周日）
+    const weekDayNum = new Date().getDay() === 0 ? 7 : new Date().getDay();
 
     container.innerHTML = `
         <div class="page-header">
@@ -83,6 +100,33 @@ export default async function renderDashboard(container) {
                 <div class="stat-icon">🔥</div>
                 <div class="stat-value">${newsFav.length}</div>
                 <div class="stat-trend">已收藏条目</div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-title">
+                <span>📅 本周总结</span>
+                <span class="text-muted text-sm">${date.format(weekStart)} ~ ${date.format(today)} · 第 ${weekDayNum} 天</span>
+            </div>
+            <div class="grid grid-4">
+                <div class="stat-card" style="padding:14px">
+                    <div class="stat-label">📚 任务完成</div>
+                    <div class="stat-value" style="font-size:22px">${weekTaskDone}<span class="text-lg text-muted">/${weekTasks.length}</span></div>
+                </div>
+                <div class="stat-card" style="padding:14px">
+                    <div class="stat-label">⚖️ 体重变化</div>
+                    <div class="stat-value ${weekWeightChange === null ? '' : (weekWeightChange < 0 ? 'text-success' : 'text-danger')}" style="font-size:22px">
+                        ${weekWeightChange === null ? '--' : `${weekWeightChange > 0 ? '+' : ''}${weekWeightChange.toFixed(1)} kg`}
+                    </div>
+                </div>
+                <div class="stat-card" style="padding:14px">
+                    <div class="stat-label">💰 本周结余</div>
+                    <div class="stat-value ${weekBalance >= 0 ? 'text-success' : 'text-danger'}" style="font-size:22px">${formatMoney(weekBalance)}</div>
+                </div>
+                <div class="stat-card" style="padding:14px">
+                    <div class="stat-label">🔥 收藏热点</div>
+                    <div class="stat-value" style="font-size:22px">${weekNewsFav.length}</div>
+                </div>
             </div>
         </div>
 
