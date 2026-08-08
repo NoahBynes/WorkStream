@@ -1,6 +1,6 @@
 // IndexedDB 封装 - 统一数据访问层
 const DB_NAME = 'workstream-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // 数据库表结构定义
 const STORES = {
@@ -40,6 +40,10 @@ function openDB() {
                     (config.indexes || []).forEach(idx => store.createIndex(idx.name, idx.keyPath, { unique: false }));
                 }
             });
+            // 清理已废弃的表（v4：移除番茄钟 study_sessions）
+            if (db.objectStoreNames.contains('study_sessions')) {
+                db.deleteObjectStore('study_sessions');
+            }
         };
         req.onblocked = () => {
             console.warn('DB 升级被阻塞，重试中...');

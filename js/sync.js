@@ -137,6 +137,8 @@ export async function syncAll() {
         isApplyingRemote = true;
         try {
             for (const row of (remoteRows || [])) {
+                // 跳过本地已废弃的表（如已删除的 study_sessions）
+                if (!STORES[row.store_name]) continue;
                 const localTs = getLocalTimestamp(row.store_name, row.record_id);
                 const remoteTs = row.updated_at;
 
