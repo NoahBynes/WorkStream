@@ -1,8 +1,8 @@
-// 日常学习 - 固定语言任务 + 任务清单 + 番茄钟（含全屏）+ 进度追踪
+// 日常学习 - 固定语言任务 + 任务清单 + 进度追踪
 import { dbGetAll, dbAdd, dbPut, dbDelete, genId } from '../db.js';
-import { date, escapeHtml, toast, confirmDialog, store, formDialog } from '../store.js';
+import { date, escapeHtml, toast, confirmDialog } from '../store.js';
 
-let pageState = { filter: 'all', timer: null, remaining: 25 * 60, running: false, mode: 'work', fullscreen: false };
+let pageState = { filter: 'all' };
 
 // 首次进入初始化学习固定任务模板
 const DEFAULT_ROUTINES = [
@@ -21,15 +21,12 @@ export default async function renderStudy(container) {
     }
 
     const tasks = await dbGetAll('study_tasks');
-    const sessions = await dbGetAll('study_sessions');
 
     const today = date.today();
     const todayTasks = tasks.filter(t => t.date === today && !t.routineId);
     const doneToday = todayTasks.filter(t => t.done).length;
     const weekStart = date.daysAgo(7);
     const doneWeek = tasks.filter(t => t.done && t.date >= weekStart).length;
-    const totalPomodoro = sessions.filter(s => s.date === today && s.completed).length;
-    const totalMinutes = sessions.filter(s => s.date === today && s.completed).reduce((s, x) => s + x.duration, 0);
 
     // 今日固定任务打卡情况
     const todayRoutines = routines.filter(r => r.enabled);
@@ -37,7 +34,7 @@ export default async function renderStudy(container) {
         tasks.some(t => t.routineId === r.id && t.date === today && t.done)
     ).length;
 
-    render(container, tasks, routines, { doneToday, doneWeek, totalPomodoro, totalMinutes, todayTasks, todayRoutines, todayRoutineDone });
+    render(container, tasks, routines, { doneToday, doneWeek, todayTasks, todayRoutines, todayRoutineDone });
 }
 
 function render(container, tasks, routines, stats) {
@@ -48,11 +45,11 @@ function render(container, tasks, routines, stats) {
         <div class="page-header">
             <div>
                 <div class="page-title">📚 日常学习</div>
-                <div class="page-subtitle">固定任务 · 任务清单 · 番茄钟 · 进度追踪</div>
+                <div class="page-subtitle">固定任务 · 任务清单 · 进度追踪</div>
             </div>
         </div>
 
-        <div class="grid grid-4 mb-4">
+        <div class="grid grid-2 mb-4">
             <div class="stat-card">
                 <div class="stat-label">今日固定任务</div>
                 <div class="stat-icon">🎯</div>
@@ -64,18 +61,6 @@ function render(container, tasks, routines, stats) {
                 <div class="stat-icon">✅</div>
                 <div class="stat-value">${stats.doneToday}<span class="text-lg text-muted">/${stats.todayTasks.length}</span></div>
                 <div class="stat-trend">已添加任务</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">今日番茄钟</div>
-                <div class="stat-icon">🍅</div>
-                <div class="stat-value">${stats.totalPomodoro}</div>
-                <div class="stat-trend">个</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">今日专注</div>
-                <div class="stat-icon">⏱️</div>
-                <div class="stat-value">${Math.floor(stats.totalMinutes / 60)}<span class="text-lg text-muted">h</span> ${stats.totalMinutes % 60}<span class="text-lg text-muted">m</span></div>
-                <div class="stat-trend">累计时长</div>
             </div>
         </div>
 
@@ -107,78 +92,48 @@ function render(container, tasks, routines, stats) {
             </div>
         </div>
 
-        <div class="grid grid-2">
-            <div class="card">
-                <div class="card-title">
-                    <span>📋 额外任务</span>
-                    <div class="actions">
-                        <button class="btn btn-sm btn-ghost" data-filter="all">全部</button>
-                        <button class="btn btn-sm btn-ghost" data-filter="todo">待办</button>
-                        <button class="btn btn-sm btn-ghost" data-filter="done">已完成</button>
-                    </div>
-                </div>
-
-                <form id="task-form" class="mb-3">
-                    <div class="flex gap-2">
-                        <input class="input" id="task-input" placeholder="添加任务，回车确认..." required>
-                        <select class="select" id="task-priority" style="width:90px">
-                            <option value="low">🟢 低</option>
-                            <option value="medium" selected>🟡 中</option>
-                            <option value="high">🔴 高</option>
-                        </select>
-                        <button class="btn" type="submit">添加</button>
-                    </div>
-                    <input class="input mt-2" id="task-subject" placeholder="科目/标签（可选）">
-                </form>
-
-                <div class="list" id="task-list">
-                    ${filtered.length === 0
-                        ? `<div class="empty"><div class="empty-icon">📝</div><div>暂无任务</div></div>`
-                        : filtered.sort((a, b) => (a.done - b.done) || b.createdAt.localeCompare(a.createdAt)).map(t => `
-                            <div class="list-item">
-                                <input type="checkbox" class="checkbox" data-id="${t.id}" ${t.done ? 'checked' : ''}>
-                                <div style="flex:1;${t.done ? 'opacity:0.5;text-decoration:line-through' : ''}">
-                                    <div>${escapeHtml(t.title)}</div>
-                                    ${t.subject ? `<div class="text-sm text-muted">${escapeHtml(t.subject)}</div>` : ''}
-                                </div>
-                                <span class="tag">${t.priority === 'high' ? '🔴 高' : t.priority === 'medium' ? '🟡 中' : '🟢 低'}</span>
-                                <button class="btn btn-sm btn-ghost" data-del="${t.id}">删除</button>
-                            </div>
-                        `).join('')}
+        <div class="card mt-4">
+            <div class="card-title">
+                <span>📋 额外任务</span>
+                <div class="actions">
+                    <button class="btn btn-sm btn-ghost" data-filter="all">全部</button>
+                    <button class="btn btn-sm btn-ghost" data-filter="todo">待办</button>
+                    <button class="btn btn-sm btn-ghost" data-filter="done">已完成</button>
                 </div>
             </div>
 
-            <div class="flex-col gap-4">
-                <div class="card">
-                    <div class="card-title">
-                        <span>🍅 番茄钟</span>
-                        <div class="actions">
-                            <button class="btn btn-sm btn-ghost" id="btn-fullscreen" title="全屏专注">⛶ 全屏</button>
-                            <span class="tag" id="timer-mode">${pageState.mode === 'work' ? '专注中' : '休息中'}</span>
-                        </div>
-                    </div>
-                    <div class="text-center" style="padding:20px 0;cursor:pointer" id="timer-area">
-                        <div id="timer-display" style="font-size:56px;font-weight:700;font-variant-numeric:tabular-nums">${formatTime(pageState.remaining)}</div>
-                        <div class="text-muted text-sm mt-2">${pageState.mode === 'work' ? '专注 25 分钟 · 点击全屏排除干扰' : '休息 5 分钟'}</div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button class="btn flex-1" id="timer-toggle">${pageState.running ? '暂停' : '开始'}</button>
-                        <button class="btn btn-secondary flex-1" id="timer-reset">重置</button>
-                        <button class="btn btn-secondary flex-1" id="timer-switch">${pageState.mode === 'work' ? '切休息' : '切专注'}</button>
-                    </div>
+            <form id="task-form" class="mb-3">
+                <div class="flex gap-2">
+                    <input class="input" id="task-input" placeholder="添加任务，回车确认..." required>
+                    <select class="select" id="task-priority" style="width:90px">
+                        <option value="low">🟢 低</option>
+                        <option value="medium" selected>🟡 中</option>
+                        <option value="high">🔴 高</option>
+                    </select>
+                    <button class="btn" type="submit">添加</button>
                 </div>
+                <input class="input mt-2" id="task-subject" placeholder="科目/标签（可选）">
+            </form>
 
-                <div class="card">
-                    <div class="card-title"><span>📝 今日记录</span></div>
-                    <div id="session-list" class="list"></div>
-                </div>
+            <div class="list" id="task-list">
+                ${filtered.length === 0
+                    ? `<div class="empty"><div class="empty-icon">📝</div><div>暂无任务</div></div>`
+                    : filtered.sort((a, b) => (a.done - b.done) || b.createdAt.localeCompare(a.createdAt)).map(t => `
+                        <div class="list-item">
+                            <input type="checkbox" class="checkbox" data-id="${t.id}" ${t.done ? 'checked' : ''}>
+                            <div style="flex:1;${t.done ? 'opacity:0.5;text-decoration:line-through' : ''}">
+                                <div>${escapeHtml(t.title)}</div>
+                                ${t.subject ? `<div class="text-sm text-muted">${escapeHtml(t.subject)}</div>` : ''}
+                            </div>
+                            <span class="tag">${t.priority === 'high' ? '🔴 高' : t.priority === 'medium' ? '🟡 中' : '🟢 低'}</span>
+                            <button class="btn btn-sm btn-ghost" data-del="${t.id}">删除</button>
+                        </div>
+                    `).join('')}
             </div>
         </div>
     `;
 
     bindEvents(container, routines, tasks);
-    loadSessions();
-    if (pageState.timer) updateTimerDisplay();
 }
 
 function filterTasks(tasks, filter) {
@@ -257,182 +212,6 @@ function bindEvents(container, routines, allTasks) {
             }
         }
     });
-
-    // 番茄钟
-    document.getElementById('timer-toggle').addEventListener('click', toggleTimer);
-    document.getElementById('timer-reset').addEventListener('click', resetTimer);
-    document.getElementById('timer-switch').addEventListener('click', switchMode);
-    document.getElementById('btn-fullscreen').addEventListener('click', enterFullscreen);
-    document.getElementById('timer-area').addEventListener('click', enterFullscreen);
-}
-
-// ============ 番茄钟全屏 ============
-function enterFullscreen() {
-    if (pageState.fullscreen) return;
-    pageState.fullscreen = true;
-    const fs = document.createElement('div');
-    fs.className = 'pomodoro-fullscreen';
-    fs.id = 'pomodoro-fs';
-    fs.innerHTML = `
-        <div class="pf-progress" id="pf-progress"></div>
-        <div class="pf-mode" id="pf-mode">${pageState.mode === 'work' ? '🍅 专注中' : '☕ 休息中'}</div>
-        <div class="pf-time" id="pf-time">${formatTime(pageState.remaining)}</div>
-        <div class="pf-actions">
-            <button class="pf-btn pf-btn-primary" id="pf-toggle">${pageState.running ? '暂停' : '开始'}</button>
-            <button class="pf-btn pf-btn-ghost" id="pf-exit">退出全屏</button>
-        </div>
-    `;
-    document.body.appendChild(fs);
-    updateFullscreenDisplay();
-
-    fs.querySelector('#pf-toggle').addEventListener('click', () => {
-        toggleTimer();
-        fs.querySelector('#pf-toggle').textContent = pageState.running ? '暂停' : '开始';
-    });
-    fs.querySelector('#pf-exit').addEventListener('click', exitFullscreen);
-    fs.addEventListener('keydown', (e) => { if (e.key === 'Escape') exitFullscreen(); });
-    // 点击空白不退出，避免误触；ESC 退出
-    document.addEventListener('keydown', escHandler);
-}
-
-function escHandler(e) { if (e.key === 'Escape') exitFullscreen(); }
-
-function exitFullscreen() {
-    document.getElementById('pomodoro-fs')?.remove();
-    document.removeEventListener('keydown', escHandler);
-    pageState.fullscreen = false;
-    // 同步按钮状态
-    const toggle = document.getElementById('timer-toggle');
-    if (toggle) toggle.textContent = pageState.running ? '暂停' : '开始';
-    updateTimerDisplay();
-}
-
-function updateFullscreenDisplay() {
-    const fs = document.getElementById('pomodoro-fs');
-    if (!fs || !pageState.fullscreen) return;
-    const timeEl = fs.querySelector('#pf-time');
-    const modeEl = fs.querySelector('#pf-mode');
-    const progEl = fs.querySelector('#pf-progress');
-    const total = pageState.mode === 'work' ? 25 * 60 : 5 * 60;
-    const used = total - pageState.remaining;
-    if (timeEl) timeEl.textContent = formatTime(pageState.remaining);
-    if (modeEl) modeEl.textContent = pageState.mode === 'work' ? '🍅 专注中' : '☕ 休息中';
-    if (progEl) progEl.style.width = (used / total * 100) + '%';
-}
-
-function toggleTimer() {
-    if (pageState.running) {
-        clearInterval(pageState.timer);
-        pageState.timer = null;
-        pageState.running = false;
-    } else {
-        pageState.running = true;
-        pageState.timer = setInterval(async () => {
-            pageState.remaining--;
-            if (pageState.remaining <= 0) {
-                clearInterval(pageState.timer);
-                pageState.timer = null;
-                pageState.running = false;
-                await completeSession();
-                return;
-            }
-            updateTimerDisplay();
-            updateFullscreenDisplay();
-        }, 1000);
-    }
-    const toggle = document.getElementById('timer-toggle');
-    if (toggle) toggle.textContent = pageState.running ? '暂停' : '开始';
-    if (pageState.fullscreen) {
-        const pfToggle = document.getElementById('pf-toggle');
-        if (pfToggle) pfToggle.textContent = pageState.running ? '暂停' : '开始';
-    }
-}
-
-function resetTimer() {
-    clearInterval(pageState.timer);
-    pageState.timer = null;
-    pageState.running = false;
-    pageState.remaining = pageState.mode === 'work' ? 25 * 60 : 5 * 60;
-    document.getElementById('timer-toggle').textContent = '开始';
-    updateTimerDisplay();
-    updateFullscreenDisplay();
-}
-
-function switchMode() {
-    clearInterval(pageState.timer);
-    pageState.timer = null;
-    pageState.running = false;
-    pageState.mode = pageState.mode === 'work' ? 'break' : 'work';
-    pageState.remaining = pageState.mode === 'work' ? 25 * 60 : 5 * 60;
-    const modeEl = document.getElementById('timer-mode');
-    if (modeEl) modeEl.textContent = pageState.mode === 'work' ? '专注中' : '休息中';
-    const sub = document.querySelector('#timer-area .text-muted');
-    if (sub) sub.textContent = pageState.mode === 'work' ? '专注 25 分钟 · 点击全屏排除干扰' : '休息 5 分钟';
-    const sw = document.getElementById('timer-switch');
-    if (sw) sw.textContent = pageState.mode === 'work' ? '切休息' : '切专注';
-    const toggle = document.getElementById('timer-toggle');
-    if (toggle) toggle.textContent = '开始';
-    updateTimerDisplay();
-    updateFullscreenDisplay();
-}
-
-async function completeSession() {
-    if (pageState.mode === 'work') {
-        await dbAdd('study_sessions', {
-            id: genId(), date: date.today(), startTime: date.now(),
-            duration: 25, completed: true, mode: 'work'
-        });
-        toast('🍅 番茄钟完成！休息一下', 'success');
-        pageState.mode = 'break';
-        pageState.remaining = 5 * 60;
-    } else {
-        toast('休息结束，继续加油！', 'success');
-        pageState.mode = 'work';
-        pageState.remaining = 25 * 60;
-    }
-    const modeEl = document.getElementById('timer-mode');
-    if (modeEl) modeEl.textContent = pageState.mode === 'work' ? '专注中' : '休息中';
-    const toggle = document.getElementById('timer-toggle');
-    if (toggle) toggle.textContent = '开始';
-    const sw = document.getElementById('timer-switch');
-    if (sw) sw.textContent = pageState.mode === 'work' ? '切休息' : '切专注';
-    if (pageState.fullscreen) {
-        const pfToggle = document.getElementById('pf-toggle');
-        if (pfToggle) pfToggle.textContent = '开始';
-        const pfMode = document.getElementById('pf-mode');
-        if (pfMode) pfMode.textContent = pageState.mode === 'work' ? '🍅 专注中' : '☕ 休息中';
-    }
-    updateTimerDisplay();
-    updateFullscreenDisplay();
-    loadSessions();
-    refresh();
-}
-
-function updateTimerDisplay() {
-    const el = document.getElementById('timer-display');
-    if (el) el.textContent = formatTime(pageState.remaining);
-}
-
-function formatTime(sec) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-async function loadSessions() {
-    const sessions = await dbGetAll('study_sessions');
-    const todaySessions = sessions.filter(s => s.date === date.today()).sort((a, b) => b.startTime.localeCompare(a.startTime));
-    const el = document.getElementById('session-list');
-    if (!el) return;
-    el.innerHTML = todaySessions.length === 0
-        ? `<div class="empty"><div class="text-muted text-sm">今天还没有专注记录</div></div>`
-        : todaySessions.map(s => `
-            <div class="list-item">
-                <span>🍅</span>
-                <span style="flex:1">专注 ${s.duration} 分钟</span>
-                <span class="text-muted text-sm">${date.format(s.startTime, true).slice(11)}</span>
-            </div>
-        `).join('');
 }
 
 // ============ 固定任务管理 ============
@@ -519,16 +298,12 @@ function showRoutineManager(routines) {
 async function refresh() {
     const routines = await dbGetAll('study_routines');
     const tasks = await dbGetAll('study_tasks');
-    const sessions = await dbGetAll('study_sessions');
     const today = date.today();
     const todayTasks = tasks.filter(t => t.date === today && !t.routineId);
     const doneToday = todayTasks.filter(t => t.done).length;
     const weekStart = date.daysAgo(7);
     const doneWeek = tasks.filter(t => t.done && t.date >= weekStart).length;
-    const totalPomodoro = sessions.filter(s => s.date === today && s.completed).length;
-    const totalMinutes = sessions.filter(s => s.date === today && s.completed).reduce((s, x) => s + x.duration, 0);
     const todayRoutines = routines.filter(r => r.enabled);
     const todayRoutineDone = todayRoutines.filter(r => tasks.some(t => t.routineId === r.id && t.date === today && t.done)).length;
-    render(document.getElementById('page-container'), tasks, routines, { doneToday, doneWeek, totalPomodoro, totalMinutes, todayTasks, todayRoutines, todayRoutineDone });
-    loadSessions();
+    render(document.getElementById('page-container'), tasks, routines, { doneToday, doneWeek, todayTasks, todayRoutines, todayRoutineDone });
 }

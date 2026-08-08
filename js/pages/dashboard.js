@@ -27,8 +27,8 @@ export default async function renderDashboard(container) {
     // 固定任务：启用的 routines
     const enabledRoutines = routines.filter(r => r.enabled);
 
-    // 身材：体重数据（用于图表）
-    const weights = fitness.filter(f => f.type === 'weight').sort((a, b) => b.date.localeCompare(a.date));
+    // 身材：体重数据（仅最近 7 天，用于图表）
+    const weights = fitness.filter(f => f.type === 'weight' && f.date >= date.daysAgo(7)).sort((a, b) => a.date.localeCompare(b.date));
 
     // 近 7 天支出
     const sevenDaysAgo = date.daysAgo(7);
@@ -219,7 +219,7 @@ export default async function renderDashboard(container) {
 
     // 渲染图表
     renderExpenseChart(recentExpenses);
-    renderWeightChart(weights.slice(0, 14).reverse());
+    renderWeightChart(weights);
 }
 
 async function refresh() {

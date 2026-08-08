@@ -5,7 +5,6 @@ const DB_VERSION = 3;
 // 数据库表结构定义
 const STORES = {
     study_tasks: { keyPath: 'id', indexes: [{ name: 'createdAt', keyPath: 'createdAt' }, { name: 'done', keyPath: 'done' }, { name: 'date', keyPath: 'date' }] },
-    study_sessions: { keyPath: 'id', indexes: [{ name: 'date', keyPath: 'date' }] },
     study_routines: { keyPath: 'id', indexes: [{ name: 'category', keyPath: 'category' }, { name: 'enabled', keyPath: 'enabled' }] },
     fitness_records: { keyPath: 'id', indexes: [{ name: 'date', keyPath: 'date' }, { name: 'type', keyPath: 'type' }] },
     fitness_weekly_plan: { keyPath: 'id', indexes: [{ name: 'weekday', keyPath: 'weekday' }] },
