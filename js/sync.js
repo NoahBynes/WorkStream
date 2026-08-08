@@ -144,13 +144,17 @@ export async function syncAll() {
 
                 // 远程比本地新才覆盖
                 if (!localTs || new Date(remoteTs) > new Date(localTs)) {
-                    if (row.data && row.data.__deleted) {
-                        await dbDelete(row.store_name, row.record_id).catch(() => {});
-                    } else if (row.data) {
-                        await dbPut(row.store_name, row.data);
-                        setLocalTimestamp(row.store_name, row.record_id, remoteTs);
+                    try {
+                        if (row.data && row.data.__deleted) {
+                            await dbDelete(row.store_name, row.record_id).catch(() => {});
+                        } else if (row.data) {
+                            await dbPut(row.store_name, row.data);
+                            setLocalTimestamp(row.store_name, row.record_id, remoteTs);
+                        }
+                        pulled++;
+                    } catch (e) {
+                        console.warn('[sync] 跳过记录（表不存在或写入失败）:', row.store_name, e.message);
                     }
-                    pulled++;
                 }
             }
         } finally {
@@ -159,7 +163,13 @@ export async function syncAll() {
 
         // 2. 推送本地新数据到远程
         for (const storeName of Object.keys(STORES)) {
-            const localData = await dbGetAll(storeName);
+            let localData;
+            try {
+                localData = await dbGetAll(storeName);
+            } catch (e) {
+                console.warn('[sync] 跳过表（读取失败）:', storeName, e.message);
+                continue;
+            }
             for (const record of localData) {
                 if (!record.id) continue;
                 const localTs = getLocalTimestamp(storeName, record.id) || record.createdAt || record.updatedAt;
